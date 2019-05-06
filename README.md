@@ -16,12 +16,12 @@ docker service create \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
 --env MYSQL_BACKUP_USER="MYSQL_BACKUP_USER" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
---reserve-cpu=0.5 \
---reserve-memory=100M \
+--reserve-cpu=0.05 \
+--reserve-memory=50M \
 --limit-cpu=1 \
 --limit-memory=200M \
 --with-registry-auth \
-avides/mysql-s3-backup:2.0.0
+avides/mysql-s3-backup:2.0.1
 ```
 
 ### Build & Test
