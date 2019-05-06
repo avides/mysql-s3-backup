@@ -19,4 +19,4 @@ COPY functions.sh /root/functions.sh
 RUN chmod +x /root/backup.sh
 
 ## CMD
-CMD cron && touch /var/log/backup-cron/cron.log && tail -f /var/log/backup-cron/cron.log
+CMD printenv | sed 's/^\(.*\)$/export \1/g' > /root/project_env.sh && cron && touch /var/log/backup-cron/cron.log && tail -f /var/log/backup-cron/cron.log
