@@ -3,7 +3,7 @@
 ## Docker
 [Dockerhub](https://hub.docker.com/r/avides/mysql-s3-backup/)
 
-### Produktiv
+### Run as Docker Service
 ```
 docker service create \
 --name=mysql-s3-backup \
