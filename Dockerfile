@@ -18,5 +18,15 @@ COPY backup.sh /root/backup.sh
 COPY functions.sh /root/functions.sh
 RUN chmod +x /root/backup.sh
 
+## SET ENV
+ENV S3_BUCKET_NAME **None**
+ENV S3_ACCESS_KEY **None**
+ENV S3_SECRET_KEY **None**
+ENV S3_REGION **None**
+ENV MYSQL_HOST **None**
+ENV MYSQL_PORT **None**
+ENV MYSQL_BACKUP_USER **None**
+ENV MYSQL_BACKUP_PASS **None**
+
 ## CMD
 CMD cron && touch /var/log/backup-cron/cron.log && tail -f /var/log/backup-cron/cron.log
