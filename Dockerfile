@@ -14,9 +14,10 @@ RUN chmod 0644 /etc/cron.d/backup-cron
 RUN mkdir /var/log/backup-cron
 
 ## Move scripts
+COPY entrypoint.sh /root/entrypoint.sh
 COPY backup.sh /root/backup.sh
 COPY functions.sh /root/functions.sh
-RUN chmod +x /root/backup.sh
+RUN chmod +x /root/backup.sh /root/entrypoint.sh
 
 ## CMD
-CMD printenv | sed 's/^\(.*\)$/export \1/g' > /root/project_env.sh && cron && touch /var/log/backup-cron/cron.log && tail -f /var/log/backup-cron/cron.log
+CMD /root/entrypoint.sh

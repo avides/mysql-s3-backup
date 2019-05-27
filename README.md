@@ -8,6 +8,7 @@
 docker service create \
 --name=mysql-s3-backup \
 --constraint 'node.labels.environment==production' \
+--env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
 --env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
@@ -21,7 +22,7 @@ docker service create \
 --limit-cpu=1 \
 --limit-memory=200M \
 --with-registry-auth \
-avides/mysql-s3-backup:2.0.1
+avides/mysql-s3-backup:2.1.0
 ```
 
 ### Build & Test
@@ -31,6 +32,7 @@ docker build -t mysql-s3-backup-dev .
 docker run \
 -d \
 --name=mysql-s3-backup \
+--env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
 --env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
