@@ -1,2 +1,2 @@
-0 18 * * *	root . /root/project_env.sh; /root/backup.sh >> /var/log/backup-cron/cron.log
+CRON_EXPR	root . /root/project_env.sh; /root/backup.sh >> /var/log/backup-cron/cron.log
 # An empty line is required at the end of this file for a valid cron file.
