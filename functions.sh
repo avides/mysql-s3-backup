@@ -34,8 +34,8 @@ function backup_mysql
 			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName > $STORAGE_PATH/$databaseName/$tableName.sql
 
 			# Sync to S3 and remove temp files
-			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$(date +"%Y-%m-%d")/$DB_HOST/$databaseName/
-            rm -rf $STORAGE_PATH/$databaseName
+			aws s3 cp "$STORAGE_PATH/$databaseName/$tableName.sql" s3://$BUCKET_NAME/$(date +"%Y-%m-%d")/$DB_HOST/$databaseName/
+            rm $STORAGE_PATH/$databaseName/$tableName.sql
 		done
 
 		echo "	Database $databaseName@$DB_HOST finished"
