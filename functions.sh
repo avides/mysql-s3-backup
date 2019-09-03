@@ -24,6 +24,8 @@ function backup_mysql
 
 	echo "Host $DB_HOST started ($(date))"
 
+	export START_DATE=$(date +"%Y-%m-%d")
+
 	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD -e 'show databases' -s --skip-column-names|egrep -vi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
 		echo "	Database $databaseName@$DB_HOST started"
@@ -31,10 +33,10 @@ function backup_mysql
 		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD --database=$databaseName -e 'show tables')
 		do
 			mkdir -p $STORAGE_PATH/$databaseName
-			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName > $STORAGE_PATH/$databaseName/$tableName.sql
+			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 
 			# Sync to S3 and remove temp files
-			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$(date +"%Y-%m-%d")/$DB_HOST/$databaseName/
+			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
             rm -rf $STORAGE_PATH/$databaseName
 		done
 
