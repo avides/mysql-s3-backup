@@ -36,7 +36,7 @@ function backup_mysql
 			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tail -n1 > dump_log.txt | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 
 			if ! grep "Dump completed on" dump_log.txt; then
-				echo 0 > metrics.txt
+				sed -i -e 's/1/0/g' /root/metrics.txt
 				exit 0;
 			fi
 
