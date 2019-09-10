@@ -1,0 +1,3 @@
+# HELP MySQL dumps are_succesfull
+# TYPE mysql_dumps_successful GAUGE
+mysql_dumps_successful 1
