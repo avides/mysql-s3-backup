@@ -7,6 +7,9 @@ WORKDIR /root/
 ## Install AWSCli & MySQL
 RUN apt-get update && apt-get install -y python python-pip mysql-client-5.7 && pip install awscli
 
+## Install netcat
+RUN apt-get install -y netcat
+
 ## Configure Crontab
 RUN apt-get install cron
 COPY crontab /etc/cron.d/backup-cron
@@ -17,6 +20,7 @@ RUN mkdir /var/log/backup-cron
 COPY entrypoint.sh /root/entrypoint.sh
 COPY backup.sh /root/backup.sh
 COPY functions.sh /root/functions.sh
+COPY metrics.txt /root/metrics.txt
 RUN chmod +x /root/backup.sh /root/entrypoint.sh
 
 ## CMD

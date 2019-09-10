@@ -33,7 +33,12 @@ function backup_mysql
 		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD --database=$databaseName -e 'show tables')
 		do
 			mkdir -p $STORAGE_PATH/$databaseName
-			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tail -n1 > dump_log.txt | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+
+			if ! grep "Dump completed on" dump_log.txt; then
+				echo 0 > metrics.txt
+				exit 0;
+			fi
 
 			# Sync to S3 and remove temp files
 			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
