@@ -8,6 +8,8 @@
 docker service create \
 --name=mysql-s3-backup \
 --constraint 'node.labels.environment==production' \
+--env SERVICE_9300_NAME=prometheus-exporter-mysql-s3-backup \
+--env SERVICE_9300_TAGS=http,management,prometheus-exporter,prometheus-exporter-mysql-s3-backup \
 --env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
 --env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
