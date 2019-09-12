@@ -4,7 +4,7 @@ pipeline
     
     environment
     {
-        deploymentBranch = "ITADMIN-1925"
+        deploymentBranch = "master"
         imageName = "avides/mysql-s3-backup"
         version = readFile("version.txt").trim()
     }
