@@ -33,7 +33,11 @@ function backup_mysql
 		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD --database=$databaseName -e 'show tables')
 		do
 			mkdir -p $STORAGE_PATH/$databaseName
-			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tail -n1 > dump_log.txt | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+
+			mkfifo pipe
+			tail -n1 pipe > dump_log.txt &
+			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+			rm pipe
 
 			if ! grep "Dump completed on" dump_log.txt; then
 				sed -i -e 's/1/0/g' /root/metrics.txt
