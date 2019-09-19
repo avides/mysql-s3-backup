@@ -25,7 +25,7 @@ docker service create \
 --limit-cpu=1 \
 --limit-memory=200M \
 --with-registry-auth \
-avides/mysql-s3-backup:2.3.1
+avides/mysql-s3-backup:2.3.2-SNAPSHOT
 ```
 
 ### Build & Test
