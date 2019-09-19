@@ -47,7 +47,7 @@ function backup_mysql
 			fi
 
 			# Sync to S3 and remove temp files
-			# aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
+			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
             rm -rf $STORAGE_PATH/$databaseName
 		done
 
