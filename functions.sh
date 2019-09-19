@@ -30,24 +30,28 @@ function backup_mysql
 	do
 		echo "	Database $databaseName@$DB_HOST started"
 
+		mkdir -p dump_logs/$databaseName
+
 		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD --database=$databaseName -e 'show tables')
 		do
 			mkdir -p $STORAGE_PATH/$databaseName
 
 			mkfifo pipe
-			tail -n1 pipe > dump_log.txt &
+			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
 			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 			rm pipe
 
-			if ! grep "Dump completed on" dump_log.txt; then
+			if ! grep "Dump completed on" dump_logs/$databaseName/$tableName.log; then
 				sed -i -e 's/1/0/g' /root/metrics.txt
 				exit 0;
 			fi
 
 			# Sync to S3 and remove temp files
-			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
+			# aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
             rm -rf $STORAGE_PATH/$databaseName
 		done
+
+		rm -r dump_logs
 
 		echo "	Database $databaseName@$DB_HOST finished"
 	done
