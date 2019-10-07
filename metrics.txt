@@ -1,3 +1,3 @@
-# HELP MySQL S3 Backup successful
+# HELP mysql_s3_backup_successful
 # TYPE mysql_s3_backup_successful gauge
 mysql_s3_backup_successful 1
