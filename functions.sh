@@ -7,12 +7,12 @@ function backup_mysql_and_upload
 	DB_USER=$3
 	DB_PASSWORD=$4
 	STORAGE_PATH=$5
-	
+
 	backup_mysql $DB_HOST $DB_PORT $DB_USER $DB_PASSWORD $STORAGE_PATH
 
 	## create metrics
 	merge_metrics_data
-	
+
 	## remove temp files
 	rm -rf $BACKUP_PATH
 }
@@ -50,7 +50,7 @@ function backup_mysql
 			## Validate if MySQL is completed and update metrics
 			if ! grep "Dump completed on" dump_logs/$databaseName/$tableName.log; then
 				sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
-				exit 0;
+				return;
 			fi
 
 			## Sync to S3 and remove temp files
