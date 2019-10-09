@@ -55,6 +55,6 @@ export AWS_DEFAULT_REGION=$S3_REGION
 
 ## MySQL-Servers
 echo "STARTING BACKUP ($(date))"
-add_metric "mysql_s3_backup_start_timestamp" $(($(date +%s%N)/1000000)
+add_metric "mysql_s3_backup_start_timestamp" $(($(date +%s%N)/1000000))
 backup_mysql_and_upload ${MYSQL_HOST} ${MYSQL_PORT} ${MYSQL_BACKUP_USER} ${MYSQL_BACKUP_PASS} $BACKUP_PATH
 echo "FINISHED BACKUP ($(date))"
