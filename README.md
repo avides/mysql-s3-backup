@@ -1,7 +1,7 @@
 # mysql-s3-backup
 [![Docker Pulls](https://img.shields.io/docker/pulls/avides/mysql-s3-backup.svg?maxAge=604800)][hub]
 
-This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a seperate "gz"-file. This script will be executed by a specified cron expression.
+This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a separate "sql.gz"-file. This script will be executed by a specified cron expression.
 
 ## Requirements
 
@@ -57,7 +57,7 @@ docker exec -it mysql-s3-backup /bin/bash
 
 ## Metrics
 
-This container delivers some metrics about the MySQL backups. The metrics are avaiable to the HTTP endpoint "/metrics" listend on port 9300. Following metrics are collected:
+This container delivers some metrics about the MySQL backups. The metrics are available to the HTTP endpoint "/metrics" on port 9300. Following metrics are collected:
 
 | Name | Datatype |
 |---|---|
