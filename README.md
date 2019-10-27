@@ -10,7 +10,7 @@ This script is used to backup a MySQL Server, ZIP the data and upload it to Amaz
 
 ## Usage
 
-Set up your variables in the placeholder and run the following comamnd on your docker server:
+Set up your variables in the placeholder and run the following command on your docker server:
 ```
 docker run \
 -d \
@@ -30,7 +30,7 @@ avides/mysql-s3-backup:2.4.2
 
 ### Build & Test
 
-The following commands are useful if you want to run the code local.
+The following commands are useful if you want to run the code locally.
 
 ```
 docker build -t mysql-s3-backup-dev .
