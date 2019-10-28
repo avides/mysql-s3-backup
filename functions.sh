@@ -44,8 +44,11 @@ function backup_mysql
 			## Create MySQL dump
 			mkfifo pipe
 			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
+			PIDOF_SUCCESS_CHECK=$!
+
 			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 			rm pipe
+			wait $PIDOF_SUCCESS_CHECK
 
 			## Validate if MySQL is completed and update metrics
 			if ! grep "Dump completed on" dump_logs/$databaseName/$tableName.log; then
