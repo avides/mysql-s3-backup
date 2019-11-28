@@ -57,7 +57,7 @@ function backup_mysql
 			fi
 
 			## Sync to S3 and remove temp files
-			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$DB_HOST/$databaseName/
+			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$databaseName/
 
 			## Create file size metrics
 			add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"${tableName}\"}" $(wc -c < $STORAGE_PATH/$databaseName/$tableName.sql.gz)

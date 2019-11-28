@@ -24,6 +24,11 @@ if [ -z ${S3_BUCKET_NAME+x} ]; then
     exit 1
 fi
 
+if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
+    echo "Use default MySQL host alias: $MYSQL_HOST"
+    MYSQL_HOST_ALIAS=$MYSQL_HOST
+fi
+
 if [ -z ${MYSQL_HOST+x} ]; then
     echo "ERROR: Please set the MYSQL_HOST!"
     exit 1
