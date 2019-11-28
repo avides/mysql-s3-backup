@@ -25,7 +25,7 @@ docker run \
 --env MYSQL_BACKUP_USER="root" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
 -p 9300:9300 \
-avides/mysql-s3-backup:2.4.3-SNAPSHOT
+avides/mysql-s3-backup:2.4.3
 ```
 
 ### Build & Test
