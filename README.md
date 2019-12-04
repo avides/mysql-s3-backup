@@ -72,4 +72,4 @@ This container delivers some metrics about the MySQL backups. The metrics are av
 
 To use the preconfigured dashboard for Grafana you have to import the `grafana-dashboard/config.json`-file to your Grafana instance.
 
-![Grafana dashboard example](https://github.com/avides/mysql-s3-backup/grafana-dashboard/example.png "Grafana dashboard example")
+![Grafana dashboard example](https://github.com/avides/mysql-s3-backup/blob/master/grafana-dashboard/example.png "Grafana dashboard example")
