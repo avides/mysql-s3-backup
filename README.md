@@ -67,3 +67,9 @@ This container delivers some metrics about the MySQL backups. The metrics are av
 | mysql_s3_backup_start_timestamp | gauge (timestamp in milliesconds) |
 | mysql_s3_backup_file_size_in_bytes{database="database", table="table"} | gauge (file size in bytes) |
 | mysql_s3_backup_duration_in_ms{database="database", table="table"} | gauge (duration in millieseconds) |
+
+## Grafana dashboard
+
+To use the preconfigured dashboard for Grafana you have to import the `grafana-dashboard/config.json`-file to your Grafana instance.
+
+![Grafana dashboard example](https://github.com/avides/mysql-s3-backup/grafana-dashboard/example.png "Grafana dashboard example")
