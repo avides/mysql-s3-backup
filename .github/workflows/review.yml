@@ -24,4 +24,4 @@ jobs:
       - name: build-image
         run: |
           export PROJECT_VERSION=${{ steps.project_version_check.outputs.version }}
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+          docker build -t ${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${GITHUB_REPOSITORY}:latest .
