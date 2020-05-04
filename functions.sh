@@ -46,7 +46,7 @@ function backup_mysql
 			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
 			PIDOF_SUCCESS_CHECK=$!
 
-			mysqldump --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+			mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 			rm pipe
 			wait $PIDOF_SUCCESS_CHECK
 
