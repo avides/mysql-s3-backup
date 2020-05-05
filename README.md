@@ -1,4 +1,6 @@
 # mysql-s3-backup
+[![Build](https://github.com/avides/mysql-s3-backup/workflows/release/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
+[![Nightly build](https://github.com/avides/mysql-s3-backup/workflows/nightly/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
 [![Docker Pulls](https://img.shields.io/docker/pulls/avides/mysql-s3-backup.svg)](https://hub.docker.com/r/avides/mysql-s3-backup)
 
 This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a separate "sql.gz"-file. This script will be executed by a specified cron expression.
@@ -26,7 +28,7 @@ docker run \
 --env MYSQL_BACKUP_USER="root" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
 -p 9300:9300 \
-avides/mysql-s3-backup:2.5.1
+avides/mysql-s3-backup:2.5.2
 ```
 
 ### Build & Test
