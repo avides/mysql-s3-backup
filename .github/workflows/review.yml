@@ -22,6 +22,6 @@ jobs:
           additional-files-to-check: README.md
  
       - name: build-image
-        run: |
-          export PROJECT_VERSION=${{ steps.project_version_check.outputs.version }}
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+        env:
+          PROJECT_VERSION: ${{ steps.project_version_check.outputs.version }}
+        run: docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .

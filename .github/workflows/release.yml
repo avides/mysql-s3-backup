@@ -25,8 +25,9 @@ jobs:
           only-return-version: true
  
       - name: push-image
+        env:
+          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
         run: |
-          export PROJECT_VERSION=${{ steps.get_project_version_check.outputs.version }}
           docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} -p ${{ secrets.DOCKER_REGISTRY_TOKEN }}
           docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
           docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}

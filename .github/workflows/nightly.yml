@@ -13,7 +13,15 @@ jobs:
       - name: checkout
         uses: actions/checkout@v1
  
+      - name: get-project-version
+        id: get_project_version_check
+        uses: avides/actions-project-version-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          file-to-check: version.txt
+          only-return-version: true
+ 
       - name: build-image
-        run: |
-          export PROJECT_VERSION=$(cat version.txt)
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+        env:
+          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
+        run: docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
