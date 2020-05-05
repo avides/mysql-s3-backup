@@ -1,0 +1,19 @@
+name: nightly
+ 
+on:
+  schedule:
+    - cron: 0 0 * * *
+ 
+jobs:
+  nightly:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+ 
+      - name: build-image
+        run: |
+          export PROJECT_VERSION=$(cat version.txt)
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .

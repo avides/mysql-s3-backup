@@ -1,0 +1,35 @@
+name: release
+ 
+on:
+  push:
+    branches:
+      - master
+ 
+jobs:
+  release:
+    timeout-minutes: 30
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+ 
+      - name: get-project-version
+        id: get_project_version_check
+        uses: avides/actions-project-version-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          file-to-check: version.txt
+          only-return-version: true
+ 
+      - name: push-image
+        run: |
+          export PROJECT_VERSION=${{ steps.get_project_version_check.outputs.version }}
+          docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} -p ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+          docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
+          if [[ "$PROJECT_VERSION" != *"SNAPSHOT"* || "$PROJECT_VERSION" != *"RC"* ]]; then
+            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
+          fi
