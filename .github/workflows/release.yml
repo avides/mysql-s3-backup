@@ -3,7 +3,7 @@ name: release
 on:
   push:
     branches:
-      - ITADMIN-2378
+      - master
 
 jobs:
   release:
