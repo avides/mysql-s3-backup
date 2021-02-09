@@ -28,7 +28,7 @@ docker run \
 --env MYSQL_BACKUP_USER="root" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
 -p 9300:9300 \
-avides/mysql-s3-backup:2.5.3
+avides/mysql-s3-backup:2.6.0-SNAPSHOT
 ```
 
 ### Build & Test
@@ -46,7 +46,7 @@ docker run \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
 --env S3_REGION="AWS_REGION" \
---env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST}" \
+--env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
 --env MYSQL_HOST="MYSQL_HOST" \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
 --env MYSQL_BACKUP_USER="root" \

@@ -4,11 +4,11 @@ FROM ubuntu:18.04
 ## Defaults
 WORKDIR /root/
 
-## Install AWSCli & MySQL
-RUN apt-get update && apt-get install -y python python-pip mysql-client-5.7 && pip install awscli
+## Install Python 3, AWSCli, MySQL and Python simple HTTP Server
+RUN apt update && apt install -y python3 python3-pip mysql-client-5.7 && pip3 install awscli && pip3 install simple_http_server
 
-## Install netcat
-RUN apt-get install -y netcat
+## Setup HTTP Server
+COPY webserver.py /root/webserver.py
 
 ## Configure Crontab
 RUN apt-get install cron
