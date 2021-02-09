@@ -1,18 +1,18 @@
 name: nightly
- 
+
 on:
   schedule:
-    - cron: 0 0 * * *
- 
+    - cron: 0 0 * * 1
+
 jobs:
   nightly:
     timeout-minutes: 30
     runs-on: ubuntu-latest
- 
+
     steps:
       - name: checkout
-        uses: actions/checkout@v1
- 
+        uses: actions/checkout@v2
+
       - name: get-project-version
         id: get_project_version
         uses: avides/actions-project-version-check@v1
@@ -20,7 +20,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt
           only-return-version: true
- 
+
       - name: build-image
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
