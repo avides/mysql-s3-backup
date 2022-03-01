@@ -5,6 +5,12 @@
 
 This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a separate "sql.gz"-file. This script will be executed by a specified cron expression.
 
+## TODOS
+
+I fork this repo to:
+- add STDERR to logfile
+- add an environment variable to set the S3 path
+
 ## Requirements
 
 - Docker
