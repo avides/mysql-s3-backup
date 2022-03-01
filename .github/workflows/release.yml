@@ -36,23 +36,3 @@ jobs:
         with:
           push: true
           tags: computablefacts/mysql-s3-backup:${{ steps.get_project_version.outputs.version }},computablefacts/mysql-s3-backup:latest
-
-      - name: setup-github-release
-        id: setup_github_release
-        env:
-          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
-        run: |
-          echo ::set-output name=gitcommitmessage::$(git log --no-merges -1 --oneline)
-          if [[ "$PROJECT_VERSION" == *"SNAPSHOT"* || "$PROJECT_VERSION" == *"RC"* ]]; then
-            echo ::set-output name=isprerelease::true
-          fi
-
-      - name: github-release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_project_version.outputs.version }}
-          release_name: ${{ steps.get_project_version.outputs.version }}
-          body: ${{ steps.setup_github_release.outputs.gitcommitmessage }}
-          prerelease: ${{ steps.setup_github_release.outputs.isprerelease }}
