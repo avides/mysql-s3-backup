@@ -10,6 +10,7 @@ This script is used to backup a MySQL Server, ZIP the data and upload it to Amaz
 I fork this repo to:
 - add STDERR to logfile
 - add an environment variable to set the S3 path
+- add an environment variable to make a dump of the whole database
 
 ## Requirements
 
