@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  mysql:
+    image: mysql:8.0
+    env_file:
+      - .env
+      
+  phpmyadmin:
+    depends_on:
+      - mysql
+    image: phpmyadmin
+    env_file:
+      - .env
+    ports:
+      - "8099:80"
+      
+  backup-s3:
+    depends_on:
+      - mysql
+    build: .
+    env_file:
+      - .env
