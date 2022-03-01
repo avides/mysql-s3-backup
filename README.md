@@ -12,7 +12,7 @@ I fork this repo to:
 - [x] add STDERR output to logfile
 - [x] allow `/` in cron expression like in "*/15 * * * *"
 - [x] allow to set AWS credential from a Docker secret (linked to /root/.aws/credentials)
-- [ ] add an environment variable to set the S3 path
+- [x] add an environment variable to set the S3 path
 - [ ] add an environment variable to make a dump of the whole database
 
 ## Requirements
