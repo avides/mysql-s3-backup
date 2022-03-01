@@ -34,10 +34,11 @@ jobs:
         id: docker_build
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
+          PATRICK_DEBUG: ${GITHUB_REPOSITORY}:${PROJECT_VERSION}
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION},${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
+          tags: ${GITHUB_REPOSITORY}:${PROJECT_VERSION},${GITHUB_REPOSITORY}:latest
 
       - name: setup-github-release
         id: setup_github_release
