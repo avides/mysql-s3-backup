@@ -33,6 +33,12 @@ if [ -z ${S3_PATH_FORMAT+x} ]; then
     export S3_PATH_FORMAT=@MYSQL_HOST_ALIAS/@databaseName/%Y/%m
 fi
 
+if [ -z ${S3_TABLE_FORMAT+x} ]; then
+    echo "Use default S3_TABLE_FORMAT..."
+    echo "$S3_TABLE_FORMAT"
+    export S3_TABLE_FORMAT=%Y-%m-%d-%H-%M-@tableName
+fi
+
 if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
     echo "Use default MySQL host alias: $MYSQL_HOST"
     MYSQL_HOST_ALIAS=$MYSQL_HOST

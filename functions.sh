@@ -28,6 +28,7 @@ function backup_mysql
 	echo "Host $DB_HOST started ($(date))"
 
 	export S3_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_PATH_FORMAT")
+	export S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_FORMAT")
 
 	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD -e 'show databases' -s --skip-column-names|egrep -vi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
@@ -46,7 +47,12 @@ function backup_mysql
 			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
 			PIDOF_SUCCESS_CHECK=$!
 
-			mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+			# Replace @tableName to $tableName (for example)
+			S3_TABLE_FILENAME=$(echo "$S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT" | tr "@" "$")
+			# Do variable replacement ($tableName for example)
+			S3_TABLE_FILENAME=$(eval echo $S3_TABLE_FILENAME)
+
+			mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$S3_TABLE_FILENAME.sql.gz
 			rm pipe
 			wait $PIDOF_SUCCESS_CHECK
 
