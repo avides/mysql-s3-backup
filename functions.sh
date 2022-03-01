@@ -14,7 +14,7 @@ function backup_mysql_and_upload
 	merge_metrics_data
 
 	## remove temp files
-	rm -rf $BACKUP_PATH
+	rm -rf $STORAGE_PATH
 }
 
 function backup_mysql
