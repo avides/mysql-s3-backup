@@ -12,7 +12,7 @@ else
 fi
 
 if [ -z ${S3_SECRET_KEY+x} ]; then
-    echo "ERROR: Please set the S3_SECRET_KEY or create /root/.aws/credentials file!"
+    echo "WARNING: Please set the S3_SECRET_KEY or create /root/.aws/credentials file!"
 else
     ## Set S3 environment variables
     export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
