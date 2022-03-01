@@ -32,6 +32,8 @@ jobs:
 
       - name: Build and push
         id: docker_build
+        env:
+          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
         uses: docker/build-push-action@v2
         with:
           push: true
