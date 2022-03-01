@@ -34,11 +34,10 @@ jobs:
         id: docker_build
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
-          PATRICK_DEBUG: ${{GITHUB_REPOSITORY}}:${{PROJECT_VERSION}}
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: ${GITHUB_REPOSITORY}:${PROJECT_VERSION},${GITHUB_REPOSITORY}:latest
+          tags: computablefacts/mysql-s3-backup:${PROJECT_VERSION},computablefacts/mysql-s3-backup:latest
 
       - name: setup-github-release
         id: setup_github_release
