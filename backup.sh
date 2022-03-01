@@ -30,7 +30,7 @@ fi
 
 if [ -z ${S3_PATH_FORMAT+x} ]; then
     echo "Use default S3_PATH_FORMAT..."
-    export S3_PATH_FORMAT=@MYSQL_HOST_ALIAS/@databaseName/%Y/%m
+    export S3_PATH_FORMAT=@MYSQL_HOST_ALIAS/@databaseName/%Y-%m-%d
 fi
 
 if [ -z ${S3_TABLE_FORMAT+x} ]; then
