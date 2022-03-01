@@ -8,9 +8,12 @@ This script is used to backup a MySQL Server, ZIP the data and upload it to Amaz
 ## TODOS
 
 I fork this repo to:
-- add STDERR to logfile
-- add an environment variable to set the S3 path
-- add an environment variable to make a dump of the whole database
+
+- [x] add STDERR output to logfile
+- [x] allow `/` in cron expression like in "*/15 * * * *"
+- [x] allow to set AWS credential from a Docker secret (linked to /root/.aws/credentials)
+- [ ] add an environment variable to set the S3 path
+- [ ] add an environment variable to make a dump of the whole database
 
 ## Requirements
 
