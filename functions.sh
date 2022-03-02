@@ -97,7 +97,7 @@ function backup_mysql_tables
 
 		dumpFilepath=$STORAGE_PATH/$databaseName/$dumpPath/$dumpFilename.sql.gz
 
-		mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $dumpFilepath
+		mysqldump --single-transaction --quick --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $dumpFilepath
 		rm pipe
 		wait $PIDOF_SUCCESS_CHECK
 
@@ -147,7 +147,7 @@ function backup_mysql_database
 
 	dumpFilepath=$STORAGE_PATH/$databaseName/$dumpPath/$dumpFilename.sql.gz
 
-	mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName | tee pipeDatabase | gzip > $dumpFilepath
+	mysqldump --single-transaction --quick --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName | tee pipeDatabase | gzip > $dumpFilepath
 	rm pipeDatabase
 	wait $PIDOF_SUCCESS_CHECK
 
