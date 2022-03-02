@@ -43,6 +43,11 @@ if [ -z ${S3_DATABASE_FILENAME+x} ]; then
     export S3_DATABASE_FILENAME=@databaseName
 fi
 
+if [ -z ${S3_TABLE_PATH+x} ]; then
+    echo "Use default S3_TABLE_PATH..."
+    export S3_TABLE_PATH=tables
+fi
+
 if [ -z ${S3_TABLE_FILENAME+x} ]; then
     echo "Use default S3_TABLE_FILENAME..."
     export S3_TABLE_FILENAME=%Y-%m-%d-%H-%M-@tableName

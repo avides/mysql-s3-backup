@@ -29,6 +29,7 @@ function backup_mysql
 
 	# Compute here to have the same date remplacement for all paths and files
 	export S3_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_ROOT_PATH")
+	export S3_TABLE_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_PATH")
 	export S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_FILENAME")
 	export S3_DATABASE_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_DATABASE_PATH")
 	export S3_DATABASE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_DATABASE_FILENAME")
@@ -84,11 +85,19 @@ function backup_mysql_tables
 		PIDOF_SUCCESS_CHECK=$!
 
 		# Replace @tableName to $tableName (for example)
-		S3_TABLE_FILENAME=$(echo "$S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT" | tr "@" "$")
+		dumpPath=$(echo "$S3_TABLE_PATH_AFTER_DATE_REPLACEMENT" | tr "@" "$")
 		# Do variable replacement ($tableName for example)
-		S3_TABLE_FILENAME=$(eval echo $S3_TABLE_FILENAME)
+		dumpPath=$(eval echo $dumpPath)
+		mkdir -p $STORAGE_PATH/$databaseName/$dumpPath
 
-		mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/tables/$S3_TABLE_FILENAME.sql.gz
+		# Replace @tableName to $tableName (for example)
+		dumpFilename=$(echo "$S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT" | tr "@" "$")
+		# Do variable replacement ($tableName for example)
+		dumpFilename=$(eval echo $dumpFilename)
+
+		dumpFilepath=$STORAGE_PATH/$databaseName/$dumpPath/$dumpFilename.sql.gz
+
+		mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $dumpFilepath
 		rm pipe
 		wait $PIDOF_SUCCESS_CHECK
 
@@ -99,7 +108,7 @@ function backup_mysql_tables
 		fi
 
 		## Create file size metrics
-		add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"${tableName}\"}" $(wc -c < $STORAGE_PATH/$databaseName/tables/$S3_TABLE_FILENAME.sql.gz)
+		add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"${tableName}\"}" $(wc -c < $dumpFilepath)
 		add_metric "mysql_s3_backup_duration_in_ms{database=\"${databaseName}\",table=\"${tableName}\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
 	done
