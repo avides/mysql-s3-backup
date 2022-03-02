@@ -14,7 +14,7 @@ I fork this repo to:
 - [x] allow to set AWS credential from a Docker secret (linked to /root/.aws/credentials)
 - [x] add an environment variable to set the S3 path
 - [x] add an environment variable to set the table dump filename
-- [ ] add an environment variable to make a dump of the whole database
+- [x] add an environment variable to make a dump of the whole database
 
 ## Requirements
 
