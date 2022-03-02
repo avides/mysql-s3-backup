@@ -16,7 +16,7 @@ I fork this repo to:
 - [x] add an environment variable to set the table dump filename
 - [x] add an environment variable to make a dump of the whole database
 - [x] add an environment variable to set the database dump filename
-- [ ] add an environment variable to set the database dump path
+- [x] add an environment variable to set the database dump path
 - [ ] add an environment variable to set the table dump path
 
 ## Requirements
