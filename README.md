@@ -17,6 +17,7 @@ I fork this repo to:
 - [x] add an environment variable to set the database dump filename
 - [x] add an environment variable to set the database dump path
 - [x] add an environment variable to set the table dump path
+- [x] add `--single-transaction` option to mysqldump 
 
 ## Requirements
 
