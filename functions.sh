@@ -157,14 +157,6 @@ function backup_mysql_database
 		return;
 	fi
 
-	# Replace @tableName to $tableName (for example)
-	S3_PATH=$(echo "$S3_PATH_AFTER_DATE_REPLACEMENT" | tr "@" "$")
-	# Do variable replacement ($tableName for example)
-	S3_PATH=$(eval echo $S3_PATH)
-
-	## Sync to S3 and remove temp files
-	aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$S3_PATH/
-
 	## Create file size metrics
 	add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"ALL\"}" $(wc -c < $dumpFilepath)
 	add_metric "mysql_s3_backup_duration_in_ms{database=\"${databaseName}\",table=\"ALL\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
