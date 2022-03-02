@@ -30,7 +30,7 @@ fi
 
 if [ -z ${S3_ROOT_PATH+x} ]; then
     echo "Use default S3_ROOT_PATH..."
-    export S3_ROOT_PATH=@MYSQL_HOST_ALIAS/@databaseName/%Y-%m-%d
+    export S3_ROOT_PATH=@MYSQL_HOST_ALIAS/@databaseName
 fi
 
 if [ -z ${S3_DATABASE_PATH+x} ]; then
@@ -40,17 +40,17 @@ fi
 
 if [ -z ${S3_DATABASE_FILENAME+x} ]; then
     echo "Use default S3_DATABASE_FILENAME..."
-    export S3_DATABASE_FILENAME=@databaseName
+    export S3_DATABASE_FILENAME=%Y-%m-%d-%H-%M-@databaseName
 fi
 
 if [ -z ${S3_TABLE_PATH+x} ]; then
     echo "Use default S3_TABLE_PATH..."
-    export S3_TABLE_PATH=tables
+    export S3_TABLE_PATH=%Y-%m-%d-%H-%M-tables
 fi
 
 if [ -z ${S3_TABLE_FILENAME+x} ]; then
     echo "Use default S3_TABLE_FILENAME..."
-    export S3_TABLE_FILENAME=%Y-%m-%d-%H-%M-@tableName
+    export S3_TABLE_FILENAME=@tableName
 fi
 
 if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
