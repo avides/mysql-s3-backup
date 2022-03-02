@@ -1,7 +1,6 @@
 # mysql-s3-backup
-[![Build](https://github.com/avides/mysql-s3-backup/workflows/release/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
-[![Nightly build](https://github.com/avides/mysql-s3-backup/workflows/nightly/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
-[![Docker Pulls](https://img.shields.io/docker/pulls/avides/mysql-s3-backup.svg)](https://hub.docker.com/r/avides/mysql-s3-backup)
+[![Build](https://github.com/computablefacts/mysql-s3-backup/workflows/release/badge.svg)](https://github.com/computablefacts/mysql-s3-backup/actions)
+[![Docker Pulls](https://img.shields.io/docker/pulls/computablefacts/mysql-s3-backup.svg)](https://hub.docker.com/r/computablefacts/mysql-s3-backup)
 
 This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a separate "sql.gz"-file. This script will be executed by a specified cron expression.
 
@@ -42,7 +41,7 @@ docker run \
 --env MYSQL_BACKUP_USER="root" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
 -p 9300:9300 \
-avides/mysql-s3-backup:2.6.0
+computablefacts/mysql-s3-backup:2.7.0
 ```
 
 ### Build & Test
@@ -72,6 +71,33 @@ docker logs -f mysql-s3-backup
 
 docker exec -it mysql-s3-backup /bin/bash
 ```
+
+### Build & Test with Docker compose
+
+Make an `.env` file from `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Change your AWS settings:
+```
+S3_ACCESS_KEY=your_access_key
+S3_SECRET_KEY=your_secret_key
+S3_BUCKET_NAME=your_bucket_name
+S3_REGION=eu-west-3
+```
+
+Start the containers:
+```bash
+docker-compose up
+```
+
+This will start a MySQL server, a phpMyAdmin and the mysql-s3-backup containers.
+You can use phpMyAdmin, found at http://localhost:8099/, to create some databases and tables.
+Then you could see the backups done on your S3 bucket. 
+
+Happy testing!
 
 ## Metrics
 
