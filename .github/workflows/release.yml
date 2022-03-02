@@ -24,33 +24,15 @@ jobs:
           file-to-check: version.txt
           only-return-version: true
 
-      - name: push-image
-        env:
-          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
-        run: |
-          docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} -p ${{ secrets.DOCKER_REGISTRY_TOKEN }}
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
-          docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
-          if [[ "$PROJECT_VERSION" != *"SNAPSHOT"* || "$PROJECT_VERSION" != *"RC"* ]]; then
-            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
-          fi
-
-      - name: setup-github-release
-        id: setup_github_release
-        env:
-          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
-        run: |
-          echo ::set-output name=gitcommitmessage::$(git log --no-merges -1 --oneline)
-          if [[ "$PROJECT_VERSION" == *"SNAPSHOT"* || "$PROJECT_VERSION" == *"RC"* ]]; then
-            echo ::set-output name=isprerelease::true
-          fi
-
-      - name: github-release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
         with:
-          tag_name: ${{ steps.get_project_version.outputs.version }}
-          release_name: ${{ steps.get_project_version.outputs.version }}
-          body: ${{ steps.setup_github_release.outputs.gitcommitmessage }}
-          prerelease: ${{ steps.setup_github_release.outputs.isprerelease }}
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: computablefacts/mysql-s3-backup:${{ steps.get_project_version.outputs.version }},computablefacts/mysql-s3-backup:latest

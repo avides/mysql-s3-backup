@@ -5,13 +5,17 @@ source functions.sh
 
 ## Check if variables are given
 if [ -z ${S3_ACCESS_KEY+x} ]; then
-    echo "ERROR: Please set the S3_ACCESS_KEY!"
-    exit 1
+    echo "WARNING: Please set the S3_ACCESS_KEY or create /root/.aws/credentials file!"
+else
+    ## Set S3 environment variables
+    export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
 fi
 
 if [ -z ${S3_SECRET_KEY+x} ]; then
-    echo "ERROR: Please set the S3_SECRET_KEY!"
-    exit 1
+    echo "WARNING: Please set the S3_SECRET_KEY or create /root/.aws/credentials file!"
+else
+    ## Set S3 environment variables
+    export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
 fi
 
 if [ -z ${S3_REGION+x} ]; then
@@ -22,6 +26,31 @@ fi
 if [ -z ${S3_BUCKET_NAME+x} ]; then
     echo "ERROR: Please set the S3_BUCKET_NAME!"
     exit 1
+fi
+
+if [ -z ${S3_ROOT_PATH+x} ]; then
+    echo "Use default S3_ROOT_PATH..."
+    export S3_ROOT_PATH=@MYSQL_HOST_ALIAS/@databaseName
+fi
+
+if [ -z ${S3_DATABASE_PATH+x} ]; then
+    echo "Use default S3_DATABASE_PATH..."
+    export S3_DATABASE_PATH=/
+fi
+
+if [ -z ${S3_DATABASE_FILENAME+x} ]; then
+    echo "Use default S3_DATABASE_FILENAME..."
+    export S3_DATABASE_FILENAME=%Y-%m-%d-%H-%M-@databaseName
+fi
+
+if [ -z ${S3_TABLE_PATH+x} ]; then
+    echo "Use default S3_TABLE_PATH..."
+    export S3_TABLE_PATH=%Y-%m-%d-%H-%M-tables
+fi
+
+if [ -z ${S3_TABLE_FILENAME+x} ]; then
+    echo "Use default S3_TABLE_FILENAME..."
+    export S3_TABLE_FILENAME=@tableName
 fi
 
 if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
@@ -54,8 +83,6 @@ BACKUP_PATH="/root/backups"
 BUCKET_NAME=${S3_BUCKET_NAME}
 
 ## Set S3 environment variables
-export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
-export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
 export AWS_DEFAULT_REGION=$S3_REGION
 
 ## MySQL-Servers
