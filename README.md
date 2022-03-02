@@ -18,6 +18,7 @@ I fork this repo to:
 - [x] add an environment variable to set the database dump path
 - [x] add an environment variable to set the table dump path
 - [x] add `--single-transaction --quick` options to mysqldump 
+- [x] add `--force` options to mysqldump to dump views (and not stopping when something goes wrong)
 
 ## Requirements
 
