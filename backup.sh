@@ -28,9 +28,9 @@ if [ -z ${S3_BUCKET_NAME+x} ]; then
     exit 1
 fi
 
-if [ -z ${S3_PATH_FORMAT+x} ]; then
-    echo "Use default S3_PATH_FORMAT..."
-    export S3_PATH_FORMAT=@MYSQL_HOST_ALIAS/@databaseName/%Y-%m-%d
+if [ -z ${S3_ROOT_PATH+x} ]; then
+    echo "Use default S3_ROOT_PATH..."
+    export S3_ROOT_PATH=@MYSQL_HOST_ALIAS/@databaseName/%Y-%m-%d
 fi
 
 if [ -z ${S3_TABLE_FORMAT+x} ]; then
