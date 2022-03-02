@@ -35,7 +35,6 @@ fi
 
 if [ -z ${S3_TABLE_FORMAT+x} ]; then
     echo "Use default S3_TABLE_FORMAT..."
-    echo "$S3_TABLE_FORMAT"
     export S3_TABLE_FORMAT=%Y-%m-%d-%H-%M-@tableName
 fi
 
