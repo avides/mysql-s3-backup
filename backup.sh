@@ -33,9 +33,9 @@ if [ -z ${S3_ROOT_PATH+x} ]; then
     export S3_ROOT_PATH=@MYSQL_HOST_ALIAS/@databaseName/%Y-%m-%d
 fi
 
-if [ -z ${S3_TABLE_FORMAT+x} ]; then
-    echo "Use default S3_TABLE_FORMAT..."
-    export S3_TABLE_FORMAT=%Y-%m-%d-%H-%M-@tableName
+if [ -z ${S3_TABLE_FILENAME+x} ]; then
+    echo "Use default S3_TABLE_FILENAME..."
+    export S3_TABLE_FILENAME=%Y-%m-%d-%H-%M-@tableName
 fi
 
 if [ -z ${MYSQL_HOST_ALIAS+x} ]; then

@@ -31,7 +31,7 @@ function backup_mysql
 
 	# Compute here to have the same date remplacement for all paths and files
 	export S3_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_ROOT_PATH")
-	export S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_FORMAT")
+	export S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_FILENAME")
 
 	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD -e 'show databases' -s --skip-column-names|egrep -vi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
