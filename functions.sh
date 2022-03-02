@@ -32,6 +32,8 @@ function backup_mysql
 	# Compute here to have the same date remplacement for all paths and files
 	export S3_PATH_AFTER_DATE_REPLACEMENT=$(date +"$S3_ROOT_PATH")
 	export S3_TABLE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_TABLE_FILENAME")
+	export S3_DATABASE_FILENAME_AFTER_DATE_REPLACEMENT=$(date +"$S3_DATABASE_FILENAME")
+	
 
 	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD -e 'show databases' -s --skip-column-names|egrep -vi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
@@ -124,7 +126,14 @@ function backup_mysql_database
 	tail -n1 pipeDatabase > dump_logs/$databaseName.log &
 	PIDOF_SUCCESS_CHECK=$!
 
-	mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName | tee pipeDatabase | gzip > $STORAGE_PATH/$databaseName/$databaseName.sql.gz
+	# Replace @tableName to $tableName (for example)
+	S3_DATABASE=$(echo "$S3_DATABASE_FILENAME_AFTER_DATE_REPLACEMENT" | tr "@" "$")
+	# Do variable replacement ($tableName for example)
+	S3_DATABASE=$(eval echo $S3_DATABASE)
+
+	dumpFilename=$STORAGE_PATH/$databaseName/$S3_DATABASE.sql.gz
+
+	mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName | tee pipeDatabase | gzip > $dumpFilename
 	rm pipeDatabase
 	wait $PIDOF_SUCCESS_CHECK
 
@@ -143,7 +152,7 @@ function backup_mysql_database
 	aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$S3_PATH/
 
 	## Create file size metrics
-	add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"ALL\"}" $(wc -c < $STORAGE_PATH/$databaseName/$databaseName.sql.gz)
+	add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"ALL\"}" $(wc -c < $dumpFilename)
 	add_metric "mysql_s3_backup_duration_in_ms{database=\"${databaseName}\",table=\"ALL\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
 	echo "	  Backup whole database $databaseName@$DB_HOST started"
