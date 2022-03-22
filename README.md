@@ -59,6 +59,16 @@ docker logs -f mysql-s3-backup
 docker exec -it mysql-s3-backup /bin/bash
 ```
 
+### Trigger backup manually
+Caution: Please avoid concurrent backup processes (e.g. via cron & manual backup)!
+
+The following command must be executed inside the container.
+Therefore, you must log in inside the container or pass the command to the container. 
+
+```shell
+/root/backup.sh >> /var/log/backup-cron/cron.log
+```
+
 ## Metrics
 
 This container delivers some metrics about the MySQL backups. The metrics are available to the HTTP endpoint "/metrics" on port 9300. Following metrics are collected:

@@ -1,8 +1,10 @@
+# This configuration is used for nightly builds
 name: nightly
 
 on:
   schedule:
-    - cron: 0 0 * * 1
+    # Runs every Monday at 00:00
+    - cron: 0 0 * * MON
 
 jobs:
   nightly:
@@ -10,9 +12,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the git repository
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GPR_TOKEN }}
+          fetch-depth: ''
 
+      # Execute some necessary git commands to get more repository informations
+      - name: post-checkout
+        run: git fetch --prune --unshallow
+
+      # Get the current project version from version.txt
       - name: get-project-version
         id: get_project_version
         uses: avides/actions-project-version-check@v1
@@ -21,6 +33,7 @@ jobs:
           file-to-check: version.txt
           only-return-version: true
 
+      # Build docker image
       - name: build-image
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}

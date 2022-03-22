@@ -1,8 +1,10 @@
+# This configuration is used for the deployment and publish to docker
 name: release
 
 on:
   push:
     branches:
+      # Runs only on push to the master branch
       - master
 
 jobs:
@@ -13,9 +15,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the git repository
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GPR_TOKEN }}
+          fetch-depth: ''
 
+      # Execute some necessary git commands to get more repository informations
+      - name: post-checkout
+        run: git fetch --prune --unshallow
+
+      # Get the current project version from POM
       - name: get-project-version
         id: get_project_version
         uses: avides/actions-project-version-check@v1
@@ -24,6 +36,7 @@ jobs:
           file-to-check: version.txt
           only-return-version: true
 
+      # Build and publish docker image
       - name: push-image
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
@@ -35,6 +48,7 @@ jobs:
             docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
           fi
 
+      # Get last commit message for GitHub Release tag
       - name: setup-github-release
         id: setup_github_release
         env:
@@ -45,6 +59,7 @@ jobs:
             echo ::set-output name=isprerelease::true
           fi
 
+      # Create and publish GitHub Release tag
       - name: github-release
         uses: actions/create-release@v1
         env:
