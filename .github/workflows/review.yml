@@ -1,7 +1,9 @@
+# This configuration is used for the pull request review
 name: review
 
 on:
   pull_request:
+    # Runs only on pull request creation and on every new commit to the created pull request
     types: [opened, synchronize]
 
 jobs:
@@ -10,6 +12,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Cancels previous run for this branch that have a different commit id (SHA)
+      - name: cancel-previous-run
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
+
+      # Checkout the git repository
       - name: checkout
         uses: actions/checkout@v2
         with:
@@ -17,17 +26,19 @@ jobs:
           token: ${{ secrets.GPR_TOKEN }}
           fetch-depth: ''
 
+      # Execute some necessary git commands to get more repository informations
       - name: post-checkout
         run: git fetch --prune --unshallow
 
+      # Update GitHub Action configuration if necessary
       - name: action-configuration-autoupdate
-        id: actions_action_configuration_autoupdate
         uses: avides/actions-action-configuration-autoupdate@v1
         with:
           token: ${{ secrets.GPR_TOKEN }}
           actions-configuration-files: plain-docker-application/nightly.yml,plain-docker-application/release.yml,plain-docker-application/review.yml
           source-repository: ${{ secrets.ACTIONS_CONFIG_AUTOUPDATE_REPO }}
 
+      # Push updated GitHub Actions configuration if necessary
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           file_pattern: .github/workflows/*.yml
@@ -36,10 +47,7 @@ jobs:
           commit_author: ${{ secrets.ACTIONS_CONFIG_AUTOUPDATE_AUTHOR }}
           commit_message: Update GitHub Action configuration
 
-      - name: action-configuration-updated
-        if: ${{ steps.actions_action_configuration_autoupdate.outputs.updated }}
-        run: exit 1;
-
+      # Verify project version is updated
       - name: project-version-check
         id: project_version_check
         uses: avides/actions-project-version-check@v1
@@ -47,6 +55,26 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt
 
+      # Check if documentation reminder comment is already given
+      - name: find-documentation-reminder-comment
+        uses: peter-evans/find-comment@v1
+        id: find_documentation_reminder_comment
+        with:
+          issue-number: ${{ github.event.number }}
+          body-includes: "Confluence/GitHub documentation added or updated?"
+
+      # Add documentation reminder comment if not given
+      - name: documentation-reminder-comment
+        uses: jungwinter/comment@v1
+        id: create
+        if: ${{ steps.find_documentation_reminder_comment.outputs.comment-id == 0 }}
+        with:
+          type: create
+          body: 'Confluence/GitHub documentation added or updated?'
+          issue_number: ${{ github.event.number }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build docker image
       - name: build-image
         env:
           PROJECT_VERSION: ${{ steps.project_version_check.outputs.version }}
