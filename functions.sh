@@ -45,23 +45,21 @@ function backup_mysql
             echo " > > Table $table_name@$database_name@$DB_HOST started ($(date))"
             START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
-            ## Stream dump to S3, keep the last line of the dump and count the bytes on the way
-            mkfifo completion_pipe size_pipe
-            tail -n1 < completion_pipe > completion.txt &
-            PIDOF_COMPLETION_CHECK=$!
+            ## Stream dump to S3, count the bytes on the way
+            mkfifo size_pipe
             wc -c < size_pipe > size.txt &
             PIDOF_SIZE_COUNTER=$!
 
             set -o pipefail
-            mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | tee completion_pipe | gzip | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz
+            mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | gzip | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz
             PIPELINE_RESULT=$?
             set +o pipefail
 
-            wait $PIDOF_COMPLETION_CHECK $PIDOF_SIZE_COUNTER
-            rm completion_pipe size_pipe
+            wait $PIDOF_SIZE_COUNTER
+            rm size_pipe
 
             ## Validate dump and upload, then update metrics
-            if [ $PIPELINE_RESULT -ne 0 ] || ! grep -q "Dump completed on" completion.txt; then
+            if [ $PIPELINE_RESULT -ne 0 ]; then
                 echo " > > Table $table_name@$database_name@$DB_HOST FAILED ($(date))"
                 set_backup_failed
                 continue
@@ -76,7 +74,7 @@ function backup_mysql
         echo " > Database $database_name@$DB_HOST finished ($(date))"
     done
 
-    rm -f completion.txt size.txt
+    rm -f size.txt
 
     echo "Host $DB_HOST:$DB_PORT finished ($(date))"
 }
