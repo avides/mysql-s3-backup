@@ -14,7 +14,7 @@ jobs:
     steps:
       # Checkout the git repository
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GPR_TOKEN }}
@@ -27,7 +27,7 @@ jobs:
       # Get the current project version from version.txt
       - name: get-project-version
         id: get_project_version
-        uses: avides/actions-project-version-check@v1
+        uses: avides/actions-project-version-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt

@@ -17,7 +17,7 @@ jobs:
     steps:
       # Checkout the git repository
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GPR_TOKEN }}
@@ -30,7 +30,7 @@ jobs:
       # Get the current project version from POM
       - name: get-project-version
         id: get_project_version
-        uses: avides/actions-project-version-check@v1
+        uses: avides/actions-project-version-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt
@@ -41,10 +41,13 @@ jobs:
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
         run: |
-          docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} -p ${{ secrets.DOCKER_REGISTRY_TOKEN }}
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
-          docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
-          if [[ "$PROJECT_VERSION" != *"SNAPSHOT"* || "$PROJECT_VERSION" != *"RC"* ]]; then
+          echo ${{ secrets.DOCKER_REGISTRY_TOKEN }} | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} --password-stdin
+          if [[ "${{ steps.get_project_version.outputs.version }}" == *"SNAPSHOT"* || "${{ steps.get_project_version.outputs.version }}" == *"RC"* ]]; then
+            docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} .
+            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
+          else
+            docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
             docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
           fi
 
@@ -54,18 +57,16 @@ jobs:
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
         run: |
-          echo ::set-output name=gitcommitmessage::$(git log --no-merges -1 --oneline)
+          echo "gitcommitmessage=$(git log --no-merges -1 --oneline)" >> $GITHUB_OUTPUT
           if [[ "$PROJECT_VERSION" == *"SNAPSHOT"* || "$PROJECT_VERSION" == *"RC"* ]]; then
-            echo ::set-output name=isprerelease::true
+            echo "isprerelease=true" >> $GITHUB_OUTPUT
           fi
 
       # Create and publish GitHub Release tag
       - name: github-release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GPR_TOKEN }}
           tag_name: ${{ steps.get_project_version.outputs.version }}
-          release_name: ${{ steps.get_project_version.outputs.version }}
           body: ${{ steps.setup_github_release.outputs.gitcommitmessage }}
           prerelease: ${{ steps.setup_github_release.outputs.isprerelease }}

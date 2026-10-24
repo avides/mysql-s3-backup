@@ -1,17 +1,21 @@
 ## Update only from lts to lts
-FROM ubuntu:18.04
+FROM ubuntu:26.04
 
 ## Defaults
 WORKDIR /root/
 
-## Install Python 3, AWSCli, MySQL and Python simple HTTP Server
-RUN apt update && apt install -y python3 python3-pip mysql-client-5.7 && pip3 install awscli && pip3 install simple_http_server
+## Install MySQL-Client, Python 3 (metrics endpoint), Cron and tools for the AWS-CLI
+RUN apt update && apt install -y mysql-client python3 cron curl unzip
+
+## Install AWS-CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip awscliv2.zip
+RUN ./aws/install
 
 ## Setup HTTP Server
 COPY webserver.py /root/webserver.py
 
 ## Configure Crontab
-RUN apt-get install cron
 COPY crontab /etc/cron.d/backup-cron
 RUN chmod 0644 /etc/cron.d/backup-cron
 RUN mkdir /var/log/backup-cron

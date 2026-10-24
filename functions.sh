@@ -29,13 +29,16 @@ function backup_mysql
 
 	export START_DATE=$(date +"%Y-%m-%d")
 
-	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD -e 'show databases' -s --skip-column-names|egrep -vi "information_schema|performance_schema|sys|innodb|mysql|tmp");
+	## Password via environment, not visible in the process list
+	export MYSQL_PWD=$DB_PASSWORD
+
+	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names|grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
 		echo "	Database $databaseName@$DB_HOST started"
 
 		mkdir -p dump_logs/$databaseName
 
-		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD --database=$databaseName -e 'show tables')
+		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$databaseName -e 'show tables')
 		do
 			START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
@@ -46,18 +49,26 @@ function backup_mysql
 			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
 			PIDOF_SUCCESS_CHECK=$!
 
-			mysqldump --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASSWORD $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
+			## --column-statistics=0: client 8.x would otherwise fail against servers < 8.0
+			mysqldump --max_allowed_packet=512M --column-statistics=0 --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
 			rm pipe
 			wait $PIDOF_SUCCESS_CHECK
 
 			## Validate if MySQL is completed and update metrics
 			if ! grep "Dump completed on" dump_logs/$databaseName/$tableName.log; then
-				sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
-				return;
+				echo "		Table $tableName@$databaseName FAILED (dump)"
+				set_backup_failed
+				rm -rf $STORAGE_PATH/$databaseName
+				continue
 			fi
 
-			## Sync to S3 and remove temp files
-			aws s3 cp --recursive "$STORAGE_PATH/$databaseName/" s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$databaseName/
+			## Upload to S3
+			if ! aws s3 cp "$STORAGE_PATH/$databaseName/$tableName.sql.gz" s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$databaseName/$tableName.sql.gz; then
+				echo "		Table $tableName@$databaseName FAILED (upload)"
+				set_backup_failed
+				rm -rf $STORAGE_PATH/$databaseName
+				continue
+			fi
 
 			## Create file size metrics
 			add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"${tableName}\"}" $(wc -c < $STORAGE_PATH/$databaseName/$tableName.sql.gz)
@@ -73,6 +84,11 @@ function backup_mysql
 	done
 
 	echo "Host $DB_HOST finished ($(date))"
+}
+
+function set_backup_failed
+{
+	sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
 }
 
 function add_metric
