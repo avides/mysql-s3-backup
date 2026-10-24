@@ -29,7 +29,7 @@ docker service create \
 --reserve-cpu=0.05 \
 --reserve-memory=50M \
 --limit-cpu=1 \
---limit-memory=200M \
+--limit-memory=512M \
 --with-registry-auth \
 avides/mysql-s3-backup:latest
 ```

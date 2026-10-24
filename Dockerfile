@@ -13,8 +13,9 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o aws
     && unzip -q awscliv2.zip \
     && ./aws/install \
     && rm -r aws awscliv2.zip
-## Bigger parts for streamed uploads: the size is unknown, max. 10,000 parts -> ~640 GB per file instead of ~78 GB
-RUN aws configure set default.s3.multipart_chunksize 64MB
+## Bigger parts for streamed uploads: the size is unknown, max. 10,000 parts -> ~312 GB per file instead of ~78 GB
+## (32 MB needs ~140 MB memory for the upload, 64 MB already ~350 MB)
+RUN aws configure set default.s3.multipart_chunksize 32MB
 
 ## Setup HTTP Server
 COPY webserver.py /root/webserver.py
