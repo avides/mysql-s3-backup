@@ -8,7 +8,7 @@ This script is used to backup a MySQL Server, ZIP the data and upload it to Amaz
 ## Requirements
 
 - Docker
-- MySQL > 5.7
+- MySQL >= 8.0
 
 ## Usage
 
