@@ -32,13 +32,25 @@ function backup_mysql
 	## Password via environment, not visible in the process list
 	export MYSQL_PWD=$DB_PASSWORD
 
-	for databaseName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names|grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp");
+	if ! DATABASE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names); then
+		echo "ERROR: Listing databases on $DB_HOST failed"
+		set_backup_failed
+		return
+	fi
+
+	for databaseName in $(echo "$DATABASE_NAMES" | grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp");
 	do
 		echo "	Database $databaseName@$DB_HOST started"
 
 		mkdir -p dump_logs/$databaseName
 
-		for tableName in $(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$databaseName -e 'show tables')
+		if ! TABLE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$databaseName -e 'show tables'); then
+			echo "	Database $databaseName@$DB_HOST FAILED (listing tables)"
+			set_backup_failed
+			continue
+		fi
+
+		for tableName in $TABLE_NAMES
 		do
 			START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
