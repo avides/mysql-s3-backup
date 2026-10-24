@@ -1,10 +1,14 @@
+#!/bin/bash
+
 ## Setup
-printenv | grep -E 'PATH|S3_BUCKET_NAME|S3_ACCESS_KEY|S3_SECRET_KEY|S3_REGION|MYSQL_HOST|MYSQL_PORT|MYSQL_BACKUP_USER|MYSQL_BACKUP_PASS' | sed 's/^\(.*\)$/export \1"/g' | sed '/=/s//="/' > /root/project_env.sh
-sed -i -e "s/CRON_EXPR/${CRON_EXPR}/g" /etc/cron.d/backup-cron
+## Environment for cron, properly quoted (special characters in values are kept)
+export -p | grep -E '^declare -x (PATH|AWS_[A-Z_]+|S3_[A-Z_]+|MYSQL_[A-Z_]+)=' > /root/project_env.sh
+## Bash replacement instead of sed, so cron expressions like "*/5 * * * *" work
+CRONTAB=$(cat /etc/cron.d/backup-cron)
+echo "${CRONTAB//CRON_EXPR/$CRON_EXPR}" > /etc/cron.d/backup-cron
 
 ## Start metrics endpoint
-mkdir /var/log/webserver
-python3 /root/webserver.py > /var/log/webserver/webserver.log &
+python3 /root/webserver.py &
 
-## Starting
-cron && touch /var/log/backup-cron/cron.log && tail -f /var/log/backup-cron/cron.log
+## Starting (cron in foreground, backup output goes to the container log)
+exec cron -f

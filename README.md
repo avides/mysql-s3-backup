@@ -19,6 +19,7 @@ docker service create \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
 --env S3_REGION="AWS_REGION" \
+--env S3_STORAGE_CLASS="S3_STORAGE_CLASS (optional, e.g. STANDARD_IA, default: STANDARD)" \
 --env MYSQL_HOST="MYSQL_HOST" \
 --env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
@@ -45,6 +46,7 @@ docker run \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
 --env S3_REGION="AWS_REGION" \
+--env S3_STORAGE_CLASS="S3_STORAGE_CLASS (optional, e.g. STANDARD_IA, default: STANDARD)" \
 --env MYSQL_HOST="MYSQL_HOST" \
 --env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
@@ -59,13 +61,20 @@ docker exec -it mysql-s3-backup /bin/bash
 ```
 
 ### Trigger backup manually
-Caution: Please avoid concurrent backup processes (e.g. via cron & manual backup)!
+Only one backup runs at a time - a second start (e.g. manual backup while the cron backup runs) is rejected.
 
-The following command must be executed inside the container.
-Therefore, you must log in inside the container or pass the command to the container.
+The following command must be executed inside the container. The output goes to the container log (`docker logs`).
 
 ```shell
-/root/backup.sh >> /var/log/backup-cron/cron.log
+/root/backup.sh > /proc/1/fd/1 2>&1
+```
+
+## Restore
+
+Each table is stored as a separate "sql.gz"-file and can be restored on its own:
+
+```shell
+aws s3 cp s3://AWS_BUCKET_NAME/YYYY-MM-DD/MYSQL_HOST_ALIAS/DATABASE/TABLE.sql.gz - | gunzip | mysql --host=MYSQL_HOST --user=USER -p DATABASE
 ```
 
 ## Metrics

@@ -14,6 +14,9 @@ class MetricsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def log_message(self, format, *args):
+        pass
+
 def main():
     print("Server starting...")
     ThreadingHTTPServer(("", 9300), MetricsHandler).serve_forever()

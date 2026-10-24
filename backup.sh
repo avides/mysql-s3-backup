@@ -1,7 +1,14 @@
 #!/bin/bash
 
 ## Includes
-source functions.sh
+source /root/functions.sh
+
+## Only one backup at a time (e.g. cron & manual backup)
+exec 9>/var/lock/backup.lock
+if ! flock -n 9; then
+    echo "ERROR: Another backup is still running!"
+    exit 1
+fi
 
 ## Check if variables are given
 if [ -z ${S3_ACCESS_KEY+x} ]; then
