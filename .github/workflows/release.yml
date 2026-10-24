@@ -10,46 +10,79 @@ on:
 jobs:
   release:
     timeout-minutes: 30
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
     runs-on: ubuntu-latest
 
     steps:
       # Checkout the git repository
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GPR_TOKEN }}
-          fetch-depth: ''
+          fetch-depth: 0
 
-      # Execute some necessary git commands to get more repository informations
-      - name: post-checkout
-        run: git fetch --prune --unshallow
-
-      # Get the current project version from POM
+      # Get the current project version from version.txt
       - name: get-project-version
         id: get_project_version
-        uses: avides/actions-project-version-check@v2
+        uses: avides/actions-project-version-check@71f4eaf8ae9ef4e2dd7f3d42402b252172943565 # v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt
           only-return-version: true
 
+      # Determine docker platforms
+      - name: determine-docker-platforms
+        id: determine_docker_platforms
+        run: |
+          # .github/docker.platforms is a deliberate opt-in - without it the image is built for linux/amd64 only.
+          # One platform per line or a comma separated list, e.g. "linux/amd64,linux/arm64".
+          if [ -f ".github/docker.platforms" ]; then
+            # Commas and any whitespace (including the CR of CRLF line endings) separate platforms, so squeeze them
+            # into single commas and strip a leading or trailing one.
+            DOCKER_PLATFORMS=$(tr -s ',[:space:]' ',' < .github/docker.platforms | sed 's/^,//; s/,$//')
+          fi
+
+          if [ -z "$DOCKER_PLATFORMS" ]; then
+            DOCKER_PLATFORMS="linux/amd64"
+          fi
+          echo "detected_docker_platforms=$DOCKER_PLATFORMS" >> $GITHUB_OUTPUT
+
+      # Setup QEMU to be able to build for platforms other than the one of the runner
+      - name: setup-qemu
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      # Setup docker buildx to build for the detected platforms
+      - name: setup-buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
       # Build and publish docker image
       - name: push-image
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
+          DOCKER_PLATFORMS: ${{ steps.determine_docker_platforms.outputs.detected_docker_platforms }}
         run: |
           echo ${{ secrets.DOCKER_REGISTRY_TOKEN }} | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} --password-stdin
-          if [[ "${{ steps.get_project_version.outputs.version }}" == *"SNAPSHOT"* || "${{ steps.get_project_version.outputs.version }}" == *"RC"* ]]; then
-            docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} .
-            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
-          else
-            docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
-            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}
-            docker push ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest
+          TAGS="-t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}"
+          if [[ "${PROJECT_VERSION}" != *"SNAPSHOT"* && "${PROJECT_VERSION}" != *"RC"* ]]; then
+            TAGS="${TAGS} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest"
           fi
+          # --provenance=false keeps a single-platform image a plain image manifest instead of an index with attestations
+          docker buildx build --platform ${DOCKER_PLATFORMS} --provenance=false ${TAGS} --push .
+
+      # Setup the sonar analyse scanner
+      - name: setup-sonar
+        uses: warchant/setup-sonar-scanner@911ef81b14b267a261d70ac94e43d3c822a709d5 # v10
+
+      # Execute sonar analysis and publish results to the sonarqube server
+      - name: sonar
+        env:
+          PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
+        run: |
+          sonar-scanner \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//:} \
+            -Dsonar.projectVersion=${PROJECT_VERSION} \
+            -Dsonar.branch.name=${{ github.ref_name }}
 
       # Get last commit message for GitHub Release tag
       - name: setup-github-release
@@ -60,11 +93,13 @@ jobs:
           echo "gitcommitmessage=$(git log --no-merges -1 --oneline)" >> $GITHUB_OUTPUT
           if [[ "$PROJECT_VERSION" == *"SNAPSHOT"* || "$PROJECT_VERSION" == *"RC"* ]]; then
             echo "isprerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "isprerelease=false" >> $GITHUB_OUTPUT
           fi
 
       # Create and publish GitHub Release tag
       - name: github-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           token: ${{ secrets.GPR_TOKEN }}
           tag_name: ${{ steps.get_project_version.outputs.version }}

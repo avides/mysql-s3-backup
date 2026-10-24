@@ -19,26 +19,22 @@ jobs:
     steps:
       # Checkout the git repository
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.head_ref }}
           token: ${{ secrets.GPR_TOKEN }}
-          fetch-depth: ''
-
-      # Execute some necessary git commands to get more repository informations
-      - name: post-checkout
-        run: git fetch --prune --unshallow
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       # Update GitHub Action configuration if necessary
       - name: action-configuration-autoupdate
-        uses: avides/actions-action-configuration-autoupdate@v2
+        uses: avides/actions-action-configuration-autoupdate@a0f90ef22635e7aa21a2de7fb42b5227ae46450e # v3
         with:
           token: ${{ secrets.GPR_TOKEN }}
-          actions-configuration-files: plain-docker-application/nightly.yml,plain-docker-application/release.yml,plain-docker-application/review.yml
+          actions-configuration-files: plain-docker-application/nightly.yml,plain-docker-application/release.yml,plain-docker-application/review.yml,common/copilot-review.yml
           source-repository: ${{ secrets.ACTIONS_CONFIG_AUTOUPDATE_REPO }}
 
       # Push updated GitHub Actions configuration if necessary
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7
         with:
           file_pattern: .github/workflows/*.yml
           commit_user_name: ${{ secrets.ACTIONS_CONFIG_AUTOUPDATE_USER }}
@@ -49,14 +45,14 @@ jobs:
       # Verify project version is updated
       - name: project-version-check
         id: project_version_check
-        uses: avides/actions-project-version-check@v2
+        uses: avides/actions-project-version-check@71f4eaf8ae9ef4e2dd7f3d42402b252172943565 # v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           file-to-check: version.txt
 
       # Check if reminder comment is already given
       - name: find-reminder-comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
         id: find_reminder_comment
         with:
           issue-number: ${{ github.event.number }}
@@ -64,7 +60,7 @@ jobs:
 
       # Add reminder comment if not given
       - name: reminder-comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         id: create
         if: ${{ steps.find_reminder_comment.outputs.comment-id == 0 }}
         with:
@@ -84,8 +80,51 @@ jobs:
           issue-number: ${{ github.event.number }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Determine docker platforms
+      - name: determine-docker-platforms
+        id: determine_docker_platforms
+        run: |
+          # .github/docker.platforms is a deliberate opt-in - without it the image is built for linux/amd64 only.
+          # One platform per line or a comma separated list, e.g. "linux/amd64,linux/arm64".
+          if [ -f ".github/docker.platforms" ]; then
+            # Commas and any whitespace (including the CR of CRLF line endings) separate platforms, so squeeze them
+            # into single commas and strip a leading or trailing one.
+            DOCKER_PLATFORMS=$(tr -s ',[:space:]' ',' < .github/docker.platforms | sed 's/^,//; s/,$//')
+          fi
+
+          if [ -z "$DOCKER_PLATFORMS" ]; then
+            DOCKER_PLATFORMS="linux/amd64"
+          fi
+          echo "detected_docker_platforms=$DOCKER_PLATFORMS" >> $GITHUB_OUTPUT
+
+      # Setup QEMU to be able to build for platforms other than the one of the runner
+      - name: setup-qemu
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      # Setup docker buildx to build for the detected platforms
+      - name: setup-buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
       # Build docker image
       - name: build-image
         env:
           PROJECT_VERSION: ${{ steps.project_version_check.outputs.version }}
-        run: docker build -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+          DOCKER_PLATFORMS: ${{ steps.determine_docker_platforms.outputs.detected_docker_platforms }}
+        run: |
+          docker buildx build --platform ${DOCKER_PLATFORMS} --provenance=false -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+
+      # Setup the sonar analyse scanner
+      - name: setup-sonar
+        uses: warchant/setup-sonar-scanner@911ef81b14b267a261d70ac94e43d3c822a709d5 # v10
+
+      # Execute sonar analysis and publish results to the sonarqube server
+      - name: sonar
+        run: |
+          sonar-scanner \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//:} \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
+            -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
+            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
