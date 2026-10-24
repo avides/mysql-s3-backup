@@ -113,8 +113,8 @@ function add_metric
 		touch /root/$METRIC_NAME_FOR_DOCS.metric
 	fi
 
-	if ! grep $METRIC_NAME /root/$METRIC_NAME_FOR_DOCS.metric ; then
-		if ! grep $METRIC_NAME_FOR_DOCS /root/$METRIC_NAME_FOR_DOCS.metric ; then
+	if ! grep -qF "$METRIC_NAME" /root/$METRIC_NAME_FOR_DOCS.metric ; then
+		if ! grep -qF "$METRIC_NAME_FOR_DOCS" /root/$METRIC_NAME_FOR_DOCS.metric ; then
 			echo "# HELP $METRIC_NAME_FOR_DOCS" >> /root/$METRIC_NAME_FOR_DOCS.metric
 			echo "# TYPE $METRIC_NAME_FOR_DOCS gauge" >> /root/$METRIC_NAME_FOR_DOCS.metric
 		fi
@@ -124,13 +124,11 @@ function add_metric
 
 function merge_metrics_data
 {
-	## Save mysql_s3_backup_successful metric
-	head -n3 /root/metrics.txt > /root/mysql_s3_backup_successful.metric
-	mv /root/mysql_s3_backup_successful.metric /root/metrics.txt
-
-	## Append all other metrics
-	cat *.metric >> /root/metrics.txt
+	## Build the new snapshot next to metrics.txt and replace it atomically
+	head -n3 /root/metrics.txt > /root/metrics.tmp
+	cat /root/*.metric >> /root/metrics.tmp 2>/dev/null
+	mv /root/metrics.tmp /root/metrics.txt
 
 	## Cleanup
-	rm *.metric
+	rm -f /root/*.metric
 }
