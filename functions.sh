@@ -2,133 +2,118 @@
 
 function backup_mysql_and_upload
 {
-	DB_HOST=$1
-	DB_PORT=$2
-	DB_USER=$3
-	DB_PASSWORD=$4
-	STORAGE_PATH=$5
+    DB_HOST=$1
+    DB_PORT=$2
+    DB_USER=$3
+    DB_PASSWORD=$4
 
-	backup_mysql $DB_HOST $DB_PORT $DB_USER $DB_PASSWORD $STORAGE_PATH
+    backup_mysql $DB_HOST $DB_PORT $DB_USER $DB_PASSWORD
 
-	## create metrics
-	merge_metrics_data
-
-	## remove temp files
-	rm -rf $BACKUP_PATH
+    ## create metrics
+    merge_metrics_data
 }
 
 function backup_mysql
 {
-	DB_HOST=$1
-	DB_PORT=$2
-	DB_USER=$3
-	DB_PASSWORD=$4
-	STORAGE_PATH=$5
+    DB_HOST=$1
+    DB_PORT=$2
+    DB_USER=$3
+    DB_PASSWORD=$4
+    START_DATE=$(date +"%Y-%m-%d")
 
-	echo "Host $DB_HOST started ($(date))"
+    echo "Host $DB_HOST:$DB_PORT started ($(date))"
 
-	export START_DATE=$(date +"%Y-%m-%d")
+    ## Password via environment, not visible in the process list
+    export MYSQL_PWD=$DB_PASSWORD
 
-	## Password via environment, not visible in the process list
-	export MYSQL_PWD=$DB_PASSWORD
+    if ! DATABASE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names); then
+        echo "ERROR: Listing databases on $DB_HOST:$DB_PORT failed"
+        set_backup_failed
+        return
+    fi
+    DATABASE_NAMES=$(echo "$DATABASE_NAMES" | grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp")
 
-	if ! DATABASE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names); then
-		echo "ERROR: Listing databases on $DB_HOST failed"
-		set_backup_failed
-		return
-	fi
+    for database_name in $DATABASE_NAMES; do
+        echo " > Database $database_name@$DB_HOST started ($(date))"
 
-	for databaseName in $(echo "$DATABASE_NAMES" | grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp");
-	do
-		echo "	Database $databaseName@$DB_HOST started"
+        if ! TABLE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$database_name -e 'show tables'); then
+            echo " > Database $database_name@$DB_HOST FAILED (listing tables)"
+            set_backup_failed
+            continue
+        fi
 
-		mkdir -p dump_logs/$databaseName
+        for table_name in $TABLE_NAMES; do
+            echo " > > Table $table_name@$database_name@$DB_HOST started ($(date))"
+            START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
-		if ! TABLE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$databaseName -e 'show tables'); then
-			echo "	Database $databaseName@$DB_HOST FAILED (listing tables)"
-			set_backup_failed
-			continue
-		fi
+            ## Stream dump to S3, keep the last line of the dump and count the bytes on the way
+            mkfifo completion_pipe size_pipe
+            tail -n1 < completion_pipe > completion.txt &
+            PIDOF_COMPLETION_CHECK=$!
+            wc -c < size_pipe > size.txt &
+            PIDOF_SIZE_COUNTER=$!
 
-		for tableName in $TABLE_NAMES
-		do
-			START_TIME_IN_MS=$(($(date +%s%N)/1000000))
+            ## --column-statistics=0: client 8.x would otherwise fail against servers < 8.0
+            set -o pipefail
+            mysqldump --max_allowed_packet=512M --column-statistics=0 --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | tee completion_pipe | gzip | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz
+            PIPELINE_RESULT=$?
+            set +o pipefail
 
-			mkdir -p $STORAGE_PATH/$databaseName
+            wait $PIDOF_COMPLETION_CHECK $PIDOF_SIZE_COUNTER
+            rm completion_pipe size_pipe
 
-			## Create MySQL dump
-			mkfifo pipe
-			tail -n1 pipe > dump_logs/$databaseName/$tableName.log &
-			PIDOF_SUCCESS_CHECK=$!
+            ## Validate dump and upload, then update metrics
+            if [ $PIPELINE_RESULT -ne 0 ] || ! grep -q "Dump completed on" completion.txt; then
+                echo " > > Table $table_name@$database_name@$DB_HOST FAILED ($(date))"
+                set_backup_failed
+                continue
+            fi
 
-			## --column-statistics=0: client 8.x would otherwise fail against servers < 8.0
-			mysqldump --max_allowed_packet=512M --column-statistics=0 --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $databaseName $tableName | tee pipe | gzip > $STORAGE_PATH/$databaseName/$tableName.sql.gz
-			rm pipe
-			wait $PIDOF_SUCCESS_CHECK
+            add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${database_name}\",table=\"${table_name}\"}" $(cat size.txt)
+            add_metric "mysql_s3_backup_duration_in_ms{database=\"${database_name}\",table=\"${table_name}\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
-			## Validate if MySQL is completed and update metrics
-			if ! grep "Dump completed on" dump_logs/$databaseName/$tableName.log; then
-				echo "		Table $tableName@$databaseName FAILED (dump)"
-				set_backup_failed
-				rm -rf $STORAGE_PATH/$databaseName
-				continue
-			fi
+            echo " > > Table $table_name@$database_name@$DB_HOST finished ($(date))"
+        done
 
-			## Upload to S3
-			if ! aws s3 cp "$STORAGE_PATH/$databaseName/$tableName.sql.gz" s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$databaseName/$tableName.sql.gz; then
-				echo "		Table $tableName@$databaseName FAILED (upload)"
-				set_backup_failed
-				rm -rf $STORAGE_PATH/$databaseName
-				continue
-			fi
+        echo " > Database $database_name@$DB_HOST finished ($(date))"
+    done
 
-			## Create file size metrics
-			add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${databaseName}\",table=\"${tableName}\"}" $(wc -c < $STORAGE_PATH/$databaseName/$tableName.sql.gz)
-			add_metric "mysql_s3_backup_duration_in_ms{database=\"${databaseName}\",table=\"${tableName}\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
+    rm -f completion.txt size.txt
 
-			## Cleanup
-            rm -rf $STORAGE_PATH/$databaseName
-		done
-
-		rm -r dump_logs
-
-		echo "	Database $databaseName@$DB_HOST finished"
-	done
-
-	echo "Host $DB_HOST finished ($(date))"
+    echo "Host $DB_HOST:$DB_PORT finished ($(date))"
 }
 
 function set_backup_failed
 {
-	sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
+    sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
 }
 
 function add_metric
 {
-	METRIC_NAME=$1
-	METRIC_VALUE=$2
-	METRIC_NAME_FOR_DOCS=$(echo "$METRIC_NAME" | cut -f1 -d"{")
+    METRIC_NAME=$1
+    METRIC_VALUE=$2
+    METRIC_NAME_FOR_DOCS=$(echo "$METRIC_NAME" | cut -f1 -d"{")
 
-	if [ ! -f /root/$METRIC_NAME_FOR_DOCS.metric ] ; then
-		touch /root/$METRIC_NAME_FOR_DOCS.metric
-	fi
+    if [ ! -f /root/$METRIC_NAME_FOR_DOCS.metric ] ; then
+        touch /root/$METRIC_NAME_FOR_DOCS.metric
+    fi
 
-	if ! grep -qF "$METRIC_NAME" /root/$METRIC_NAME_FOR_DOCS.metric ; then
-		if ! grep -qF "$METRIC_NAME_FOR_DOCS" /root/$METRIC_NAME_FOR_DOCS.metric ; then
-			echo "# HELP $METRIC_NAME_FOR_DOCS" >> /root/$METRIC_NAME_FOR_DOCS.metric
-			echo "# TYPE $METRIC_NAME_FOR_DOCS gauge" >> /root/$METRIC_NAME_FOR_DOCS.metric
-		fi
-		echo "$METRIC_NAME $METRIC_VALUE" >> /root/$METRIC_NAME_FOR_DOCS.metric
-	fi
+    if ! grep -qF "$METRIC_NAME" /root/$METRIC_NAME_FOR_DOCS.metric ; then
+        if ! grep -qF "$METRIC_NAME_FOR_DOCS" /root/$METRIC_NAME_FOR_DOCS.metric ; then
+            echo "# HELP $METRIC_NAME_FOR_DOCS" >> /root/$METRIC_NAME_FOR_DOCS.metric
+            echo "# TYPE $METRIC_NAME_FOR_DOCS gauge" >> /root/$METRIC_NAME_FOR_DOCS.metric
+        fi
+        echo "$METRIC_NAME $METRIC_VALUE" >> /root/$METRIC_NAME_FOR_DOCS.metric
+    fi
 }
 
 function merge_metrics_data
 {
-	## Build the new snapshot next to metrics.txt and replace it atomically
-	head -n3 /root/metrics.txt > /root/metrics.tmp
-	cat /root/*.metric >> /root/metrics.tmp 2>/dev/null
-	mv /root/metrics.tmp /root/metrics.txt
+    ## Build the new snapshot next to metrics.txt and replace it atomically
+    head -n3 /root/metrics.txt > /root/metrics.tmp
+    cat /root/*.metric >> /root/metrics.tmp 2>/dev/null
+    mv /root/metrics.tmp /root/metrics.txt
 
-	## Cleanup
-	rm -f /root/*.metric
+    ## Cleanup
+    rm -f /root/*.metric
 }

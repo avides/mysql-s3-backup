@@ -50,7 +50,6 @@ if [ -z ${MYSQL_BACKUP_PASS+x} ]; then
 fi
 
 ## Settings
-BACKUP_PATH="/root/backups"
 BUCKET_NAME=${S3_BUCKET_NAME}
 
 ## Set S3 environment variables
@@ -58,9 +57,9 @@ export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
 export AWS_DEFAULT_REGION=$S3_REGION
 
-## MySQL-Servers
+## Backup
 echo "STARTING BACKUP ($(date))"
 sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 1/g" /root/metrics.txt
 add_metric "mysql_s3_backup_start_timestamp" $(($(date +%s%N)/1000000))
-backup_mysql_and_upload ${MYSQL_HOST} ${MYSQL_PORT} ${MYSQL_BACKUP_USER} ${MYSQL_BACKUP_PASS} $BACKUP_PATH
+backup_mysql_and_upload ${MYSQL_HOST} ${MYSQL_PORT} ${MYSQL_BACKUP_USER} ${MYSQL_BACKUP_PASS}
 echo "FINISHED BACKUP ($(date))"
