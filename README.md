@@ -85,6 +85,8 @@ This container delivers some metrics about the MySQL backups. The metrics are av
 |---|---|
 | mysql_s3_backup_successful | gauge (1=successful / 0=failed) |
 | mysql_s3_backup_start_timestamp | gauge (timestamp in milliseconds) |
+| mysql_s3_backup_last_success_timestamp | gauge (timestamp in milliseconds, end of the last successful backup) |
+| mysql_s3_backup_total_duration_in_ms | gauge (duration of the whole backup in milliseconds) |
 | mysql_s3_backup_file_size_in_bytes{database="database", table="table"} | gauge (file size in bytes) |
 | mysql_s3_backup_duration_in_ms{database="database", table="table"} | gauge (duration in milliseconds) |
 

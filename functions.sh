@@ -9,6 +9,12 @@ function backup_mysql_and_upload
 
     backup_mysql $DB_HOST $DB_PORT $DB_USER $DB_PASSWORD
 
+    ## Total duration and time of the last successful backup (kept across failed runs)
+    add_metric "mysql_s3_backup_total_duration_in_ms" $(($(($(date +%s%N)/1000000)) - $BACKUP_START_TIME_IN_MS))
+    if grep -q "^mysql_s3_backup_successful 1" /root/metrics.txt; then
+        printf '# HELP mysql_s3_backup_last_success_timestamp\n# TYPE mysql_s3_backup_last_success_timestamp gauge\nmysql_s3_backup_last_success_timestamp %s\n' $(($(date +%s%N)/1000000)) > /root/last_success.prom
+    fi
+
     ## create metrics
     merge_metrics_data
 }
@@ -51,7 +57,7 @@ function backup_mysql
             PIDOF_SIZE_COUNTER=$!
 
             set -o pipefail
-            mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | gzip | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS}
+            mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | pigz | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS}
             PIPELINE_RESULT=$?
             set +o pipefail
 
@@ -107,7 +113,7 @@ function merge_metrics_data
 {
     ## Build the new snapshot next to metrics.txt and replace it atomically
     head -n3 /root/metrics.txt > /root/metrics.tmp
-    cat /root/*.metric >> /root/metrics.tmp 2>/dev/null
+    cat /root/*.metric /root/last_success.prom >> /root/metrics.tmp 2>/dev/null
     mv /root/metrics.tmp /root/metrics.txt
 
     ## Cleanup
