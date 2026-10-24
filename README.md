@@ -92,6 +92,6 @@ This container delivers some metrics about the MySQL backups. The metrics are av
 
 ## Grafana dashboard
 
-To use the preconfigured dashboard for Grafana you have to import the [Config-File](grafana-dashboard/config.json) to your Grafana instance.
+To use the preconfigured dashboard for Grafana (>= 10) you have to import the [Config-File](grafana-dashboard/config.json) to your Grafana instance and select the Prometheus data source. It shows the state of every backup instance, the history of duration and size, and details per database and table.
 
 ![Grafana dashboard example](grafana-dashboard/example.png?raw=true "Grafana dashboard example")
