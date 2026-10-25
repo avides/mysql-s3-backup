@@ -64,10 +64,9 @@ function backup_mysql
             echo " > > Table $table_name@$database_name@$DB_HOST started ($(date))"
             START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
-            ## Stream dump to S3, count the bytes on the way
-            mkfifo size_pipe upload_pipe
-            wc -c < size_pipe > size.txt &
-            PIDOF_SIZE_COUNTER=$!
+            ## Stream dump to S3: dd collects 1 MB blocks for the upload (the dump writes small blocks, every
+            ## further pipe stage would be woken up for each of them) and reports the bytes for the metrics
+            mkfifo upload_pipe
             aws s3 cp - "s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz" ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS} < upload_pipe &
             PIDOF_UPLOAD=$!
 
@@ -75,7 +74,7 @@ function backup_mysql
             ## so no incomplete file replaces a backup (the lifecycle rule removes the aborted upload)
             exec 3> upload_pipe
             set -o pipefail
-            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz | tee size_pipe >&3
+            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz | dd bs=1M iflag=fullblock 2> dd.log >&3
             DUMP_RESULT=$?
             set +o pipefail
 
@@ -86,8 +85,7 @@ function backup_mysql
             wait $PIDOF_UPLOAD
             UPLOAD_RESULT=$?
 
-            wait $PIDOF_SIZE_COUNTER
-            rm size_pipe upload_pipe
+            rm upload_pipe
 
             ## Validate dump and upload, then update metrics
             if [[ $DUMP_RESULT -ne 0 || $UPLOAD_RESULT -ne 0 ]]; then
@@ -96,7 +94,7 @@ function backup_mysql
                 continue
             fi
 
-            add_metric "mysql_s3_backup_file_size_in_bytes{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(cat size.txt)
+            add_metric "mysql_s3_backup_file_size_in_bytes{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(awk '/bytes/ {print $1}' dd.log)
             add_metric "mysql_s3_backup_duration_in_ms{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
             echo " > > Table $table_name@$database_name@$DB_HOST finished ($(date))"
@@ -105,7 +103,7 @@ function backup_mysql
         echo " > Database $database_name@$DB_HOST finished ($(date))"
     done
 
-    rm -f size.txt
+    rm -f dd.log
 
     echo "Host $DB_HOST:$DB_PORT finished ($(date))"
     return 0
