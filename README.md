@@ -81,30 +81,17 @@ avides/mysql-s3-backup:latest
 ## Build & Test
 ```
 docker build -t mysql-s3-backup-dev .
+```
 
-docker run \
--d \
---name=mysql-s3-backup \
---env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
---env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
---env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
---env S3_SECRET_KEY="AWS_SECRET_KEY" \
---env S3_REGION="AWS_REGION" \
---env S3_STORAGE_CLASS="S3_STORAGE_CLASS (optional, e.g. STANDARD_IA, default: STANDARD)" \
---env MYSQL_HOST="MYSQL_HOST" \
---env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
---env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
---env MYSQL_BACKUP_USER="MYSQL_BACKUP_USER" \
---env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
--p 9300:9300 \
-mysql-s3-backup-dev
+Start the image as described in [Run](#run), with `mysql-s3-backup-dev` instead of `avides/mysql-s3-backup:latest` and a test bucket. Then:
 
+```
 docker logs -f mysql-s3-backup
 
 docker exec -it mysql-s3-backup /bin/bash
 ```
 
-### Trigger backup manually
+## Trigger backup manually
 Only one backup runs at a time - a second start (e.g. manual backup while the cron backup runs) is rejected.
 
 The following command must be executed inside the container. The output goes to the container log (`docker logs`).
