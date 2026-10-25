@@ -123,7 +123,7 @@ jobs:
           sonar-scanner \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//:} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY#*/} \
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
             -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
             -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \

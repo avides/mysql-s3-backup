@@ -80,7 +80,7 @@ jobs:
           sonar-scanner \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//:} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY#*/} \
             -Dsonar.projectVersion=${PROJECT_VERSION} \
             -Dsonar.branch.name=${{ github.ref_name }}
 
