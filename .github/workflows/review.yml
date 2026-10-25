@@ -110,8 +110,9 @@ jobs:
         env:
           PROJECT_VERSION: ${{ steps.project_version_check.outputs.version }}
           DOCKER_PLATFORMS: ${{ steps.determine_docker_platforms.outputs.detected_docker_platforms }}
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
         run: |
-          docker buildx build --platform ${DOCKER_PLATFORMS} --provenance=false -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest .
+          docker buildx build --platform ${DOCKER_PLATFORMS} --provenance=false -t ${DOCKER_REGISTRY}/${GITHUB_REPOSITORY}:${PROJECT_VERSION} -t ${DOCKER_REGISTRY}/${GITHUB_REPOSITORY}:latest .
 
       # Setup the sonar analyse scanner
       - name: setup-sonar
@@ -119,14 +120,21 @@ jobs:
 
       # Execute sonar analysis and publish results to the sonarcloud server
       - name: sonar
+        env:
+          OS_SONAR_HOST_URL: ${{ secrets.OS_SONAR_HOST_URL }}
+          OS_SONAR_TOKEN: ${{ secrets.OS_SONAR_TOKEN }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          PULL_REQUEST_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.ref }}
+          PULL_REQUEST_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           export SONAR_ORGANIZATION=$(echo ${GITHUB_REPOSITORY} | cut -d / -f 1)
           sonar-scanner \
-            -Dsonar.host.url=${{ secrets.OS_SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.OS_SONAR_TOKEN }} \
+            -Dsonar.host.url=${OS_SONAR_HOST_URL} \
+            -Dsonar.token=${OS_SONAR_TOKEN} \
             -Dsonar.organization=${SONAR_ORGANIZATION} \
             -Dsonar.projectKey=${GITHUB_REPOSITORY//\//_} \
-            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
-            -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
-            -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \
-            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+            -Dsonar.pullrequest.key="${PULL_REQUEST_NUMBER}" \
+            -Dsonar.pullrequest.branch="${PULL_REQUEST_BRANCH}" \
+            -Dsonar.pullrequest.base="${PULL_REQUEST_BASE}" \
+            -Dsonar.scm.revision="${PULL_REQUEST_SHA}"

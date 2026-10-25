@@ -59,11 +59,14 @@ jobs:
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
           DOCKER_PLATFORMS: ${{ steps.determine_docker_platforms.outputs.detected_docker_platforms }}
+          DOCKER_REGISTRY_TOKEN: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY_USER: ${{ secrets.DOCKER_REGISTRY_USER }}
         run: |
-          echo ${{ secrets.DOCKER_REGISTRY_TOKEN }} | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USER }} --password-stdin
-          TAGS="-t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}"
+          echo "${DOCKER_REGISTRY_TOKEN}" | docker login "${DOCKER_REGISTRY}" -u "${DOCKER_REGISTRY_USER}" --password-stdin
+          TAGS="-t ${DOCKER_REGISTRY}/${GITHUB_REPOSITORY}:${PROJECT_VERSION}"
           if [[ "${PROJECT_VERSION}" != *"SNAPSHOT"* && "${PROJECT_VERSION}" != *"RC"* ]]; then
-            TAGS="${TAGS} -t ${{ secrets.DOCKER_REGISTRY }}/${GITHUB_REPOSITORY}:latest"
+            TAGS="${TAGS} -t ${DOCKER_REGISTRY}/${GITHUB_REPOSITORY}:latest"
           fi
           # --provenance=false keeps a single-platform image a plain image manifest instead of an index with attestations
           docker buildx build --platform ${DOCKER_PLATFORMS} --provenance=false ${TAGS} --push .
@@ -76,15 +79,17 @@ jobs:
       - name: sonar
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
+          OS_SONAR_HOST_URL: ${{ secrets.OS_SONAR_HOST_URL }}
+          OS_SONAR_TOKEN: ${{ secrets.OS_SONAR_TOKEN }}
         run: |
           export SONAR_ORGANIZATION=$(echo ${GITHUB_REPOSITORY} | cut -d / -f 1)
           sonar-scanner \
-            -Dsonar.host.url=${{ secrets.OS_SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.OS_SONAR_TOKEN }} \
+            -Dsonar.host.url=${OS_SONAR_HOST_URL} \
+            -Dsonar.token=${OS_SONAR_TOKEN} \
             -Dsonar.organization=${SONAR_ORGANIZATION} \
             -Dsonar.projectKey=${GITHUB_REPOSITORY//\//_} \
             -Dsonar.projectVersion=${PROJECT_VERSION} \
-            -Dsonar.branch.name=${{ github.ref_name }}
+            -Dsonar.branch.name=${GITHUB_REF_NAME}
 
       # Get last commit message for GitHub Release tag
       - name: setup-github-release
@@ -103,6 +108,7 @@ jobs:
       - name: github-release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
+          target_commitish: ${{ github.sha }}
           token: ${{ secrets.GPR_TOKEN }}
           tag_name: ${{ steps.get_project_version.outputs.version }}
           body: ${{ steps.setup_github_release.outputs.gitcommitmessage }}
