@@ -15,6 +15,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
+        # No access log: Prometheus scrapes every few seconds and would flood the container log
         pass
 
 def main():
