@@ -10,25 +10,25 @@ if ! flock -n 9; then
     exit 1
 fi
 
+## Fresh run: no work files of an aborted run, result stays as published until the end
+rm -f /root/*.metric
+BACKUP_SUCCESSFUL=1
+
 ## Check if variables are given
 if [ -z ${S3_ACCESS_KEY+x} ]; then
-    echo "ERROR: Please set the S3_ACCESS_KEY!"
-    exit 1
+    abort_backup "Please set the S3_ACCESS_KEY!"
 fi
 
 if [ -z ${S3_SECRET_KEY+x} ]; then
-    echo "ERROR: Please set the S3_SECRET_KEY!"
-    exit 1
+    abort_backup "Please set the S3_SECRET_KEY!"
 fi
 
 if [ -z ${S3_REGION+x} ]; then
-    echo "ERROR: Please set the S3_REGION!"
-    exit 1
+    abort_backup "Please set the S3_REGION!"
 fi
 
 if [ -z ${S3_BUCKET_NAME+x} ]; then
-    echo "ERROR: Please set the S3_BUCKET_NAME!"
-    exit 1
+    abort_backup "Please set the S3_BUCKET_NAME!"
 fi
 
 if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
@@ -37,8 +37,7 @@ if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
 fi
 
 if [ -z ${MYSQL_HOST+x} ]; then
-    echo "ERROR: Please set the MYSQL_HOST!"
-    exit 1
+    abort_backup "Please set the MYSQL_HOST!"
 fi
 
 if [ -z ${MYSQL_PORT+x} ]; then
@@ -47,13 +46,11 @@ if [ -z ${MYSQL_PORT+x} ]; then
 fi
 
 if [ -z ${MYSQL_BACKUP_USER+x} ]; then
-    echo "ERROR: Please set the MYSQL_BACKUP_USER!"
-    exit 1
+    abort_backup "Please set the MYSQL_BACKUP_USER!"
 fi
 
 if [ -z ${MYSQL_BACKUP_PASS+x} ]; then
-    echo "ERROR: Please set the MYSQL_BACKUP_PASS!"
-    exit 1
+    abort_backup "Please set the MYSQL_BACKUP_PASS!"
 fi
 
 ## Settings
@@ -66,8 +63,7 @@ export AWS_DEFAULT_REGION=$S3_REGION
 
 ## Backup
 echo "STARTING BACKUP ($(date))"
-sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 1/g" /root/metrics.txt
 BACKUP_START_TIME_IN_MS=$(($(date +%s%N)/1000000))
-add_metric "mysql_s3_backup_start_timestamp" $BACKUP_START_TIME_IN_MS
+publish_start
 backup_mysql_and_upload ${MYSQL_HOST} ${MYSQL_PORT} ${MYSQL_BACKUP_USER} ${MYSQL_BACKUP_PASS}
 echo "FINISHED BACKUP ($(date))"

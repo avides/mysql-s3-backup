@@ -11,7 +11,7 @@ function backup_mysql_and_upload
 
     ## Total duration and time of the last successful backup (kept across failed runs)
     add_metric "mysql_s3_backup_total_duration_in_ms" $(($(($(date +%s%N)/1000000)) - $BACKUP_START_TIME_IN_MS))
-    if grep -q "^mysql_s3_backup_successful 1" /root/metrics.txt; then
+    if [ $BACKUP_SUCCESSFUL -eq 1 ]; then
         printf '# HELP mysql_s3_backup_last_success_timestamp\n# TYPE mysql_s3_backup_last_success_timestamp gauge\nmysql_s3_backup_last_success_timestamp %s\n' $(($(date +%s%N)/1000000)) > /root/last_success.prom
     fi
 
@@ -52,27 +52,39 @@ function backup_mysql
             START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
             ## Stream dump to S3, count the bytes on the way
-            mkfifo size_pipe
+            mkfifo size_pipe upload_pipe
             wc -c < size_pipe > size.txt &
             PIDOF_SIZE_COUNTER=$!
+            aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS} < upload_pipe &
+            PIDOF_UPLOAD=$!
 
+            ## The upload only completes when its input is closed - a failed dump kills it before,
+            ## so no incomplete file replaces a backup (the lifecycle rule removes the aborted upload)
+            exec 3> upload_pipe
             set -o pipefail
-            mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | pigz | tee size_pipe | aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS}
-            PIPELINE_RESULT=$?
+            mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | pigz | tee size_pipe >&3
+            DUMP_RESULT=$?
             set +o pipefail
 
+            if [ $DUMP_RESULT -ne 0 ]; then
+                kill $PIDOF_UPLOAD
+            fi
+            exec 3>&-
+            wait $PIDOF_UPLOAD
+            UPLOAD_RESULT=$?
+
             wait $PIDOF_SIZE_COUNTER
-            rm size_pipe
+            rm size_pipe upload_pipe
 
             ## Validate dump and upload, then update metrics
-            if [ $PIPELINE_RESULT -ne 0 ]; then
+            if [ $DUMP_RESULT -ne 0 ] || [ $UPLOAD_RESULT -ne 0 ]; then
                 echo " > > Table $table_name@$database_name@$DB_HOST FAILED ($(date))"
                 set_backup_failed
                 continue
             fi
 
-            add_metric "mysql_s3_backup_file_size_in_bytes{database=\"${database_name}\",table=\"${table_name}\"}" $(cat size.txt)
-            add_metric "mysql_s3_backup_duration_in_ms{database=\"${database_name}\",table=\"${table_name}\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
+            add_metric "mysql_s3_backup_file_size_in_bytes{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(cat size.txt)
+            add_metric "mysql_s3_backup_duration_in_ms{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
             echo " > > Table $table_name@$database_name@$DB_HOST finished ($(date))"
         done
@@ -87,7 +99,34 @@ function backup_mysql
 
 function set_backup_failed
 {
-    sed -i -e "s/mysql_s3_backup_successful.[0-9].*/mysql_s3_backup_successful 0/g" /root/metrics.txt
+    ## Published with the final snapshot, until then the result of the last run stays visible
+    BACKUP_SUCCESSFUL=0
+}
+
+function abort_backup
+{
+    echo "ERROR: $1"
+    sed "s/^mysql_s3_backup_successful .*/mysql_s3_backup_successful 0/" /root/metrics.txt > /root/metrics.tmp
+    mv /root/metrics.tmp /root/metrics.txt
+    exit 1
+}
+
+function publish_start
+{
+    ## Publish the start right away, everything else of the last run stays until the final snapshot
+    add_metric "mysql_s3_backup_start_timestamp" $BACKUP_START_TIME_IN_MS
+    {
+        head -n3 /root/metrics.txt
+        cat /root/mysql_s3_backup_start_timestamp.metric
+        tail -n +4 /root/metrics.txt | grep -v "mysql_s3_backup_start_timestamp"
+    } > /root/metrics.tmp
+    mv /root/metrics.tmp /root/metrics.txt
+}
+
+function escape_label
+{
+    ## Prometheus text format: backslash and double quote must be escaped in label values
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 function add_metric
@@ -112,7 +151,7 @@ function add_metric
 function merge_metrics_data
 {
     ## Build the new snapshot next to metrics.txt and replace it atomically
-    head -n3 /root/metrics.txt > /root/metrics.tmp
+    printf '# HELP mysql_s3_backup_successful\n# TYPE mysql_s3_backup_successful gauge\nmysql_s3_backup_successful %s\n' $BACKUP_SUCCESSFUL > /root/metrics.tmp
     cat /root/*.metric /root/last_success.prom >> /root/metrics.tmp 2>/dev/null
     mv /root/metrics.tmp /root/metrics.txt
 

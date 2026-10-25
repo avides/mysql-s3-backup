@@ -9,6 +9,7 @@ This docker image is used to backup a MySQL server into Amazon S3. It will dump,
 
 - Docker
 - MySQL >= 8.0
+- S3 bucket with a lifecycle rule that aborts incomplete multipart uploads (a failed dump aborts its upload, the uploaded parts stay until then)
 
 ## Run as Docker Service
 ```
