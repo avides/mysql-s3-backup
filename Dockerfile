@@ -21,7 +21,8 @@ RUN apt update && apt install -y --no-install-recommends ca-certificates curl my
     && rm -r aws awscliv2.zip \
     && aws configure set default.s3.multipart_chunksize 32MB \
     && chmod 0644 "$AWS_CONFIG_FILE" \
-    && curl -fsSL --proto '=https' --tlsv1.2 "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" -o /usr/local/bin/supercronic \
+    && curl -fsSL --proto '=https' --tlsv1.2 -o /usr/local/bin/supercronic \
+        "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
     && echo "${SUPERCRONIC_SHA256}  /usr/local/bin/supercronic" | sha256sum -c - \
     && chmod +x /usr/local/bin/supercronic \
     && useradd --system --uid 10001 --user-group --home-dir /app/data --no-create-home --shell /usr/sbin/nologin s3-backup \
@@ -29,10 +30,11 @@ RUN apt update && apt install -y --no-install-recommends ca-certificates curl my
     && chown s3-backup:s3-backup /app/data
 
 ## Scripts and crontab template belong to root (the backup user cannot change them),
-## the backup user only writes into /app/data (metrics, crontab, lock, pipes of the running backup)
+## the backup user only writes into /app/data (metrics, crontab, lock, pipes of the running backup),
+## metrics.txt is always replaced with mv, so the user does not need to own it
 COPY --chmod=0755 entrypoint.sh backup.sh functions.sh webserver.py /app/
 COPY --chmod=0644 crontab /app/
-COPY --chown=s3-backup:s3-backup metrics.txt /app/data/
+COPY --chmod=0644 metrics.txt /app/data/
 
 ## Run without root
 USER s3-backup
