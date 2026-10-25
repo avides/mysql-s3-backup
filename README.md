@@ -12,7 +12,11 @@ InnoDB tables are dumped in a single transaction (consistent snapshot without lo
 - Docker
 - MySQL >= 8.0
 - S3 bucket with a lifecycle rule that aborts incomplete multipart uploads (a failed dump aborts its upload, the uploaded parts stay until then)
-- MySQL user for the backup with the following privileges (missing privileges let single tables fail, without `TRIGGER` the triggers are silently missing in the dump):
+- MySQL user for the backup (see [MySQL user](#mysql-user))
+- IAM user for the upload (see [IAM user](#iam-user))
+
+### MySQL user
+The backup user needs the following privileges. Missing privileges let single tables fail, without `TRIGGER` the triggers are silently missing in the dump:
 
 ```sql
 CREATE USER 'backup'@'%' IDENTIFIED BY 'PASSWORD';
@@ -26,6 +30,30 @@ GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS ON *.* TO 'backup'@'%';
 | `TRIGGER` | dump the triggers of a table |
 | `LOCK TABLES` | dump tables without transactions (e.g. MyISAM) |
 | `PROCESS` | tablespace information of the dump (global privilege, MySQL >= 8.0.21) |
+
+### IAM user
+The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upload into the bucket (replace `AWS_BUCKET_NAME`). Reading, listing or deleting backups is not needed, so a stolen key can neither read nor destroy existing backups:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Upload",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::AWS_BUCKET_NAME/*"
+    }
+  ]
+}
+```
+
+| Permission | Needed for |
+|---|---|
+| `s3:PutObject` | upload of a file, including the multipart upload of large files (create, upload parts, complete) |
+| `s3:AbortMultipartUpload` | abort the upload of a failed dump |
+
+If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` on that key.
 
 ## Run
 ```
