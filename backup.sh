@@ -55,6 +55,9 @@ fi
 
 ## Settings
 BUCKET_NAME=${S3_BUCKET_NAME}
+## pigz uses as many threads as CPUs the container may use, not as the host has: more threads than CPUs
+## only switch between each other (at 1 CPU the default of all host cores is half as fast as one thread)
+PIGZ_THREADS=$(cpu_limit)
 
 ## Set S3 environment variables
 export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY

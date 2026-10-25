@@ -74,7 +74,7 @@ function backup_mysql
             ## so no incomplete file replaces a backup (the lifecycle rule removes the aborted upload)
             exec 3> upload_pipe
             set -o pipefail
-            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz | dd bs=1M iflag=fullblock 2> dd.log >&3
+            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz -p $PIGZ_THREADS | dd bs=1M iflag=fullblock 2> dd.log >&3
             DUMP_RESULT=$?
             set +o pipefail
 
@@ -106,6 +106,26 @@ function backup_mysql
     rm -f dd.log
 
     echo "Host $DB_HOST:$DB_PORT finished ($(date))"
+    return 0
+}
+
+function cpu_limit
+{
+    local quota period
+
+    ## CPU limit of the container (cgroup v2, then v1), rounded up - without a limit all CPUs
+    if [[ -r /sys/fs/cgroup/cpu.max ]]; then
+        read -r quota period < /sys/fs/cgroup/cpu.max
+    elif [[ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]]; then
+        quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
+        period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+    fi
+
+    if [[ $quota =~ ^[0-9]+$ && $period =~ ^[0-9]+$ && $period -gt 0 ]]; then
+        echo $(((quota + period - 1) / period))
+    else
+        nproc
+    fi
     return 0
 }
 
