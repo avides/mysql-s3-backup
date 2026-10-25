@@ -25,7 +25,8 @@ RUN apt update && apt install -y --no-install-recommends ca-certificates curl my
         "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
     && echo "${SUPERCRONIC_SHA256}  /usr/local/bin/supercronic" | sha256sum -c - \
     && chmod +x /usr/local/bin/supercronic \
-    && useradd --system --uid 10001 --user-group --home-dir /app/data --no-create-home --shell /usr/sbin/nologin s3-backup \
+    && useradd --system --uid 10001 --user-group --home-dir /app/data --no-create-home \
+        --shell /usr/sbin/nologin s3-backup \
     && mkdir -p /app/data \
     && chown s3-backup:s3-backup /app/data
 
