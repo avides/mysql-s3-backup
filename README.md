@@ -12,11 +12,27 @@ InnoDB tables are dumped in a single transaction (consistent snapshot without lo
 - Docker
 - MySQL >= 8.0
 - S3 bucket with a lifecycle rule that aborts incomplete multipart uploads (a failed dump aborts its upload, the uploaded parts stay until then)
+- MySQL user for the backup with the following privileges (missing privileges let single tables fail, without `TRIGGER` the triggers are silently missing in the dump):
 
-## Run as Docker Service
+```sql
+CREATE USER 'backup'@'%' IDENTIFIED BY 'PASSWORD';
+GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS ON *.* TO 'backup'@'%';
 ```
-docker service create \
---name mysql-s3-backup \
+
+| Privilege | Needed for |
+|---|---|
+| `SELECT` | list the databases and tables, dump the data |
+| `SHOW VIEW` | dump views |
+| `TRIGGER` | dump the triggers of a table |
+| `LOCK TABLES` | dump tables without transactions (e.g. MyISAM) |
+| `PROCESS` | tablespace information of the dump (global privilege, MySQL >= 8.0.21) |
+
+## Run
+```
+docker run \
+-d \
+--name=mysql-s3-backup \
+--restart=unless-stopped \
 --env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
 --env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
@@ -28,12 +44,9 @@ docker service create \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
 --env MYSQL_BACKUP_USER="MYSQL_BACKUP_USER" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
---publish 9300:9300 \
---reserve-cpu=0.05 \
---reserve-memory=50M \
---limit-cpu=1 \
---limit-memory=512M \
---with-registry-auth \
+-p 9300:9300 \
+--cpus=1 \
+--memory=512m \
 avides/mysql-s3-backup:latest
 ```
 
