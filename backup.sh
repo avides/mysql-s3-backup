@@ -6,7 +6,7 @@ source /root/functions.sh
 ## Only one backup at a time (e.g. cron & manual backup)
 exec 9>/var/lock/backup.lock
 if ! flock -n 9; then
-    echo "ERROR: Another backup is still running!"
+    echo "ERROR: Another backup is still running!" >&2
     exit 1
 fi
 
@@ -15,41 +15,41 @@ rm -f /root/*.metric
 BACKUP_SUCCESSFUL=1
 
 ## Check if variables are given
-if [ -z ${S3_ACCESS_KEY+x} ]; then
+if [[ -z ${S3_ACCESS_KEY+x} ]]; then
     abort_backup "Please set the S3_ACCESS_KEY!"
 fi
 
-if [ -z ${S3_SECRET_KEY+x} ]; then
+if [[ -z ${S3_SECRET_KEY+x} ]]; then
     abort_backup "Please set the S3_SECRET_KEY!"
 fi
 
-if [ -z ${S3_REGION+x} ]; then
+if [[ -z ${S3_REGION+x} ]]; then
     abort_backup "Please set the S3_REGION!"
 fi
 
-if [ -z ${S3_BUCKET_NAME+x} ]; then
+if [[ -z ${S3_BUCKET_NAME+x} ]]; then
     abort_backup "Please set the S3_BUCKET_NAME!"
 fi
 
-if [ -z ${MYSQL_HOST_ALIAS+x} ]; then
+if [[ -z ${MYSQL_HOST_ALIAS+x} ]]; then
     echo "Use default MySQL host alias: $MYSQL_HOST"
     MYSQL_HOST_ALIAS=$MYSQL_HOST
 fi
 
-if [ -z ${MYSQL_HOST+x} ]; then
+if [[ -z ${MYSQL_HOST+x} ]]; then
     abort_backup "Please set the MYSQL_HOST!"
 fi
 
-if [ -z ${MYSQL_PORT+x} ]; then
+if [[ -z ${MYSQL_PORT+x} ]]; then
     echo "Use default MySQL port 3306..."
     MYSQL_PORT=3306
 fi
 
-if [ -z ${MYSQL_BACKUP_USER+x} ]; then
+if [[ -z ${MYSQL_BACKUP_USER+x} ]]; then
     abort_backup "Please set the MYSQL_BACKUP_USER!"
 fi
 
-if [ -z ${MYSQL_BACKUP_PASS+x} ]; then
+if [[ -z ${MYSQL_BACKUP_PASS+x} ]]; then
     abort_backup "Please set the MYSQL_BACKUP_PASS!"
 fi
 

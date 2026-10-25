@@ -11,12 +11,13 @@ function backup_mysql_and_upload
 
     ## Total duration and time of the last successful backup (kept across failed runs)
     add_metric "mysql_s3_backup_total_duration_in_ms" $(($(($(date +%s%N)/1000000)) - $BACKUP_START_TIME_IN_MS))
-    if [ $BACKUP_SUCCESSFUL -eq 1 ]; then
+    if [[ $BACKUP_SUCCESSFUL -eq 1 ]]; then
         printf '# HELP mysql_s3_backup_last_success_timestamp\n# TYPE mysql_s3_backup_last_success_timestamp gauge\nmysql_s3_backup_last_success_timestamp %s\n' $(($(date +%s%N)/1000000)) > /root/last_success.prom
     fi
 
     ## create metrics
     merge_metrics_data
+    return 0
 }
 
 function backup_mysql
@@ -32,8 +33,8 @@ function backup_mysql
     ## Password via environment, not visible in the process list
     export MYSQL_PWD=$DB_PASSWORD
 
-    if ! DATABASE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names | grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp") || [ -z "$DATABASE_NAMES" ]; then
-        echo "ERROR: Listing databases on $DB_HOST:$DB_PORT failed"
+    if ! DATABASE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER -e 'show databases' -s --skip-column-names | grep -Evi "information_schema|performance_schema|sys|innodb|mysql|tmp") || [[ -z "$DATABASE_NAMES" ]]; then
+        echo "ERROR: Listing databases on $DB_HOST:$DB_PORT failed" >&2
         set_backup_failed
         return
     fi
@@ -41,13 +42,25 @@ function backup_mysql
     for database_name in $DATABASE_NAMES; do
         echo " > Database $database_name@$DB_HOST started ($(date))"
 
-        if ! TABLE_NAMES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$database_name -e 'show tables'); then
+        ## Tables with their engine (views have none)
+        if ! TABLES=$(mysql -NBA --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --database=$database_name -e "select table_name, coalesce(engine, 'VIEW') from information_schema.tables where table_schema = database()"); then
             echo " > Database $database_name@$DB_HOST FAILED (listing tables)"
             set_backup_failed
             continue
         fi
 
-        for table_name in $TABLE_NAMES; do
+        while IFS=$'\t' read -r -u 4 table_name table_engine; do
+            if [[ -z $table_name ]]; then
+                continue
+            fi
+
+            ## A consistent snapshot needs a transaction, tables without transactions (e.g. MyISAM) are locked while they are dumped
+            if [[ $table_engine == "InnoDB" || $table_engine == "VIEW" ]]; then
+                CONSISTENCY_OPTION=--single-transaction
+            else
+                CONSISTENCY_OPTION=--lock-tables
+            fi
+
             echo " > > Table $table_name@$database_name@$DB_HOST started ($(date))"
             START_TIME_IN_MS=$(($(date +%s%N)/1000000))
 
@@ -62,11 +75,11 @@ function backup_mysql
             ## so no incomplete file replaces a backup (the lifecycle rule removes the aborted upload)
             exec 3> upload_pipe
             set -o pipefail
-            mysqldump --single-transaction --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER $database_name $table_name | pigz | tee size_pipe >&3
+            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz | tee size_pipe >&3
             DUMP_RESULT=$?
             set +o pipefail
 
-            if [ $DUMP_RESULT -ne 0 ]; then
+            if [[ $DUMP_RESULT -ne 0 ]]; then
                 kill $PIDOF_UPLOAD
             fi
             exec 3>&-
@@ -77,7 +90,7 @@ function backup_mysql
             rm size_pipe upload_pipe
 
             ## Validate dump and upload, then update metrics
-            if [ $DUMP_RESULT -ne 0 ] || [ $UPLOAD_RESULT -ne 0 ]; then
+            if [[ $DUMP_RESULT -ne 0 || $UPLOAD_RESULT -ne 0 ]]; then
                 echo " > > Table $table_name@$database_name@$DB_HOST FAILED ($(date))"
                 set_backup_failed
                 continue
@@ -87,7 +100,7 @@ function backup_mysql
             add_metric "mysql_s3_backup_duration_in_ms{database=\"$(escape_label "$database_name")\",table=\"$(escape_label "$table_name")\"}" $(($(($(date +%s%N)/1000000)) - $START_TIME_IN_MS))
 
             echo " > > Table $table_name@$database_name@$DB_HOST finished ($(date))"
-        done
+        done 4<<< "$TABLES"
 
         echo " > Database $database_name@$DB_HOST finished ($(date))"
     done
@@ -95,17 +108,21 @@ function backup_mysql
     rm -f size.txt
 
     echo "Host $DB_HOST:$DB_PORT finished ($(date))"
+    return 0
 }
 
 function set_backup_failed
 {
     ## Published with the final snapshot, until then the result of the last run stays visible
     BACKUP_SUCCESSFUL=0
+    return 0
 }
 
 function abort_backup
 {
-    echo "ERROR: $1"
+    local message=$1
+
+    echo "ERROR: $message" >&2
     sed "s/^mysql_s3_backup_successful .*/mysql_s3_backup_successful 0/" /root/metrics.txt > /root/metrics.tmp
     mv /root/metrics.tmp /root/metrics.txt
     exit 1
@@ -118,15 +135,19 @@ function publish_start
     {
         head -n3 /root/metrics.txt
         cat /root/mysql_s3_backup_start_timestamp.metric
-        tail -n +4 /root/metrics.txt | grep -v "mysql_s3_backup_start_timestamp"
+        tail -n +4 /root/metrics.txt | grep -Ev "^(# (HELP|TYPE) )?mysql_s3_backup_start_timestamp( |$)"
     } > /root/metrics.tmp
     mv /root/metrics.tmp /root/metrics.txt
+    return 0
 }
 
 function escape_label
 {
+    local value=$1
+
     ## Prometheus text format: backslash and double quote must be escaped in label values
-    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+    printf '%s' "$value" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+    return 0
 }
 
 function add_metric
@@ -135,7 +156,7 @@ function add_metric
     METRIC_VALUE=$2
     METRIC_NAME_FOR_DOCS=$(echo "$METRIC_NAME" | cut -f1 -d"{")
 
-    if [ ! -f /root/$METRIC_NAME_FOR_DOCS.metric ] ; then
+    if [[ ! -f /root/$METRIC_NAME_FOR_DOCS.metric ]] ; then
         touch /root/$METRIC_NAME_FOR_DOCS.metric
     fi
 
@@ -146,6 +167,7 @@ function add_metric
         fi
         echo "$METRIC_NAME $METRIC_VALUE" >> /root/$METRIC_NAME_FOR_DOCS.metric
     fi
+    return 0
 }
 
 function merge_metrics_data
@@ -157,4 +179,5 @@ function merge_metrics_data
 
     ## Cleanup
     rm -f /root/*.metric
+    return 0
 }

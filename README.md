@@ -5,6 +5,8 @@
 
 This docker image is used to backup a MySQL server into Amazon S3. It will dump, zip and stream each table directly into a separate "sql.gz"-file in S3 (no local temporary files). The backup is executed by a specified cron expression.
 
+InnoDB tables are dumped in a single transaction (consistent snapshot without locks), tables without transactions (e.g. MyISAM) are locked while they are dumped.
+
 ## Requirements
 
 - Docker
