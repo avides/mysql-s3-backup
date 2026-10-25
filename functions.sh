@@ -55,7 +55,7 @@ function backup_mysql
             mkfifo size_pipe upload_pipe
             wc -c < size_pipe > size.txt &
             PIDOF_SIZE_COUNTER=$!
-            aws s3 cp - s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS} < upload_pipe &
+            aws s3 cp - "s3://$BUCKET_NAME/$START_DATE/$MYSQL_HOST_ALIAS/$database_name/$table_name.sql.gz" ${S3_STORAGE_CLASS:+--storage-class $S3_STORAGE_CLASS} < upload_pipe &
             PIDOF_UPLOAD=$!
 
             ## The upload only completes when its input is closed - a failed dump kills it before,
