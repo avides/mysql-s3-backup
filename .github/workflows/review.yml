@@ -30,7 +30,7 @@ jobs:
         uses: avides/actions-action-configuration-autoupdate@a0f90ef22635e7aa21a2de7fb42b5227ae46450e # v3
         with:
           token: ${{ secrets.GPR_TOKEN }}
-          actions-configuration-files: plain-docker-application/nightly.yml,plain-docker-application/release.yml,plain-docker-application/review.yml,common/copilot-review.yml
+          actions-configuration-files: os-plain-docker-application/nightly.yml,os-plain-docker-application/release.yml,os-plain-docker-application/review.yml,common/copilot-review.yml
           source-repository: ${{ secrets.ACTIONS_CONFIG_AUTOUPDATE_REPO }}
 
       # Push updated GitHub Actions configuration if necessary
@@ -56,7 +56,7 @@ jobs:
         id: find_reminder_comment
         with:
           issue-number: ${{ github.event.number }}
-          body-includes: "Confluence/GitHub documentation added or updated?"
+          body-includes: "Documentation added or updated?"
 
       # Add reminder comment if not given
       - name: reminder-comment
@@ -65,16 +65,16 @@ jobs:
         if: ${{ steps.find_reminder_comment.outputs.comment-id == 0 }}
         with:
           body: |
-            - Confluence/GitHub documentation added or updated?
+            - Documentation added or updated?
               - Diff-Links as response added?
                 - [ ] Not necessary
                 - [ ] Added
 
-            - [Breaking-Change](<https://avides.atlassian.net/wiki/spaces/ITENT/pages/211498/Wann+habe+ich+einen+breaking+change>) present?
-              - Necessary deployment adjustments added as a comment (Jira-Ticket)?
+            - Breaking-Change present?
+              - Necessary deployment adjustments added as a comment (Ticket)?
                 - [ ] Not necessary
                 - [ ] Added
-              - Necessary rollback adjustments added as a comment (Jira-Ticket)?
+              - Necessary rollback adjustments added as a comment (Ticket)?
                 - [ ] Not necessary
                 - [ ] Added
           issue-number: ${{ github.event.number }}
@@ -117,13 +117,15 @@ jobs:
       - name: setup-sonar
         uses: warchant/setup-sonar-scanner@911ef81b14b267a261d70ac94e43d3c822a709d5 # v10
 
-      # Execute sonar analysis and publish results to the sonarqube server
+      # Execute sonar analysis and publish results to the sonarcloud server
       - name: sonar
         run: |
+          export SONAR_ORGANIZATION=$(echo ${GITHUB_REPOSITORY} | cut -d / -f 1)
           sonar-scanner \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${GITHUB_REPOSITORY#*/} \
+            -Dsonar.host.url=${{ secrets.OS_SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.OS_SONAR_TOKEN }} \
+            -Dsonar.organization=${SONAR_ORGANIZATION} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//_} \
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
             -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }} \
             -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} \

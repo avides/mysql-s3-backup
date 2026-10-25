@@ -65,14 +65,16 @@ jobs:
       - name: setup-sonar
         uses: warchant/setup-sonar-scanner@911ef81b14b267a261d70ac94e43d3c822a709d5 # v10
 
-      # Execute sonar analysis and publish results to the sonarqube server
+      # Execute sonar analysis and publish results to the sonarcloud server
       - name: sonar
         env:
           PROJECT_VERSION: ${{ steps.get_project_version.outputs.version }}
         run: |
+          export SONAR_ORGANIZATION=$(echo ${GITHUB_REPOSITORY} | cut -d / -f 1)
           sonar-scanner \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${GITHUB_REPOSITORY#*/} \
+            -Dsonar.host.url=${{ secrets.OS_SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.OS_SONAR_TOKEN }} \
+            -Dsonar.organization=${SONAR_ORGANIZATION} \
+            -Dsonar.projectKey=${GITHUB_REPOSITORY//\//_} \
             -Dsonar.projectVersion=${PROJECT_VERSION} \
             -Dsonar.branch.name=master
