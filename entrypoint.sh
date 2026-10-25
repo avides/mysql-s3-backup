@@ -1,14 +1,12 @@
 #!/bin/bash
 
 ## Setup
-## Environment for cron, properly quoted (special characters in values are kept)
-export -p | grep -E '^declare -x (PATH|AWS_[A-Z0-9_]+|S3_[A-Z0-9_]+|MYSQL_[A-Z0-9_]+)=' > /root/project_env.sh
 ## Bash replacement instead of sed, so cron expressions like "*/5 * * * *" work
-CRONTAB=$(cat /etc/cron.d/backup-cron)
-echo "${CRONTAB//CRON_EXPR/$CRON_EXPR}" > /etc/cron.d/backup-cron
+CRONTAB=$(cat /app/crontab)
+echo "${CRONTAB//CRON_EXPR/$CRON_EXPR}" > /app/data/crontab
 
 ## Start metrics endpoint
-python3 /root/webserver.py &
+python3 /app/webserver.py &
 
-## Starting (cron in foreground, backup output goes to the container log)
-exec cron -f
+## Starting (supercronic in foreground, the backup inherits the environment and its output goes unchanged to the container log)
+exec supercronic -passthrough-logs /app/data/crontab

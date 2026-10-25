@@ -12,7 +12,7 @@ function backup_mysql_and_upload
     ## Total duration and time of the last successful backup (kept across failed runs)
     add_metric "mysql_s3_backup_total_duration_in_ms" $(($(($(date +%s%N)/1000000)) - $BACKUP_START_TIME_IN_MS))
     if [[ $BACKUP_SUCCESSFUL -eq 1 ]]; then
-        printf '# HELP mysql_s3_backup_last_success_timestamp\n# TYPE mysql_s3_backup_last_success_timestamp gauge\nmysql_s3_backup_last_success_timestamp %s\n' $(($(date +%s%N)/1000000)) > /root/last_success.prom
+        printf '# HELP mysql_s3_backup_last_success_timestamp\n# TYPE mysql_s3_backup_last_success_timestamp gauge\nmysql_s3_backup_last_success_timestamp %s\n' $(($(date +%s%N)/1000000)) > /app/data/last_success.prom
     fi
 
     ## create metrics
@@ -123,8 +123,8 @@ function abort_backup
     local message=$1
 
     echo "ERROR: $message" >&2
-    sed "s/^mysql_s3_backup_successful .*/mysql_s3_backup_successful 0/" /root/metrics.txt > /root/metrics.tmp
-    mv /root/metrics.tmp /root/metrics.txt
+    sed "s/^mysql_s3_backup_successful .*/mysql_s3_backup_successful 0/" /app/data/metrics.txt > /app/data/metrics.tmp
+    mv /app/data/metrics.tmp /app/data/metrics.txt
     exit 1
 }
 
@@ -133,11 +133,11 @@ function publish_start
     ## Publish the start right away, everything else of the last run stays until the final snapshot
     add_metric "mysql_s3_backup_start_timestamp" $BACKUP_START_TIME_IN_MS
     {
-        head -n3 /root/metrics.txt
-        cat /root/mysql_s3_backup_start_timestamp.metric
-        tail -n +4 /root/metrics.txt | grep -Ev "^(# (HELP|TYPE) )?mysql_s3_backup_start_timestamp( |$)"
-    } > /root/metrics.tmp
-    mv /root/metrics.tmp /root/metrics.txt
+        head -n3 /app/data/metrics.txt
+        cat /app/data/mysql_s3_backup_start_timestamp.metric
+        tail -n +4 /app/data/metrics.txt | grep -Ev "^(# (HELP|TYPE) )?mysql_s3_backup_start_timestamp( |$)"
+    } > /app/data/metrics.tmp
+    mv /app/data/metrics.tmp /app/data/metrics.txt
     return 0
 }
 
@@ -156,16 +156,16 @@ function add_metric
     METRIC_VALUE=$2
     METRIC_NAME_FOR_DOCS=$(echo "$METRIC_NAME" | cut -f1 -d"{")
 
-    if [[ ! -f /root/$METRIC_NAME_FOR_DOCS.metric ]] ; then
-        touch /root/$METRIC_NAME_FOR_DOCS.metric
+    if [[ ! -f /app/data/$METRIC_NAME_FOR_DOCS.metric ]] ; then
+        touch /app/data/$METRIC_NAME_FOR_DOCS.metric
     fi
 
-    if ! grep -qF "$METRIC_NAME" /root/$METRIC_NAME_FOR_DOCS.metric ; then
-        if ! grep -qF "$METRIC_NAME_FOR_DOCS" /root/$METRIC_NAME_FOR_DOCS.metric ; then
-            echo "# HELP $METRIC_NAME_FOR_DOCS" >> /root/$METRIC_NAME_FOR_DOCS.metric
-            echo "# TYPE $METRIC_NAME_FOR_DOCS gauge" >> /root/$METRIC_NAME_FOR_DOCS.metric
+    if ! grep -qF "$METRIC_NAME" /app/data/$METRIC_NAME_FOR_DOCS.metric ; then
+        if ! grep -qF "$METRIC_NAME_FOR_DOCS" /app/data/$METRIC_NAME_FOR_DOCS.metric ; then
+            echo "# HELP $METRIC_NAME_FOR_DOCS" >> /app/data/$METRIC_NAME_FOR_DOCS.metric
+            echo "# TYPE $METRIC_NAME_FOR_DOCS gauge" >> /app/data/$METRIC_NAME_FOR_DOCS.metric
         fi
-        echo "$METRIC_NAME $METRIC_VALUE" >> /root/$METRIC_NAME_FOR_DOCS.metric
+        echo "$METRIC_NAME $METRIC_VALUE" >> /app/data/$METRIC_NAME_FOR_DOCS.metric
     fi
     return 0
 }
@@ -173,11 +173,11 @@ function add_metric
 function merge_metrics_data
 {
     ## Build the new snapshot next to metrics.txt and replace it atomically
-    printf '# HELP mysql_s3_backup_successful\n# TYPE mysql_s3_backup_successful gauge\nmysql_s3_backup_successful %s\n' $BACKUP_SUCCESSFUL > /root/metrics.tmp
-    cat /root/*.metric /root/last_success.prom >> /root/metrics.tmp 2>/dev/null
-    mv /root/metrics.tmp /root/metrics.txt
+    printf '# HELP mysql_s3_backup_successful\n# TYPE mysql_s3_backup_successful gauge\nmysql_s3_backup_successful %s\n' $BACKUP_SUCCESSFUL > /app/data/metrics.tmp
+    cat /app/data/*.metric /app/data/last_success.prom >> /app/data/metrics.tmp 2>/dev/null
+    mv /app/data/metrics.tmp /app/data/metrics.txt
 
     ## Cleanup
-    rm -f /root/*.metric
+    rm -f /app/data/*.metric
     return 0
 }

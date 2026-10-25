@@ -1,17 +1,17 @@
 #!/bin/bash
 
 ## Includes
-source /root/functions.sh
+source /app/functions.sh
 
 ## Only one backup at a time (e.g. cron & manual backup)
-exec 9>/var/lock/backup.lock
+exec 9>/app/data/backup.lock
 if ! flock -n 9; then
     echo "ERROR: Another backup is still running!" >&2
     exit 1
 fi
 
 ## Fresh run: no work files of an aborted run, result stays as published until the end
-rm -f /root/*.metric
+rm -f /app/data/*.metric
 BACKUP_SUCCESSFUL=1
 
 ## Check if variables are given

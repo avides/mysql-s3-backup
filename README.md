@@ -3,7 +3,9 @@
 [![Nightly build](https://github.com/avides/mysql-s3-backup/workflows/nightly/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
 [![Docker Pulls](https://img.shields.io/docker/pulls/avides/mysql-s3-backup.svg)](https://hub.docker.com/r/avides/mysql-s3-backup)
 
-This docker image is used to backup a MySQL server into Amazon S3. It will dump, zip and stream each table directly into a separate "sql.gz"-file in S3 (no local temporary files). The backup is executed by a specified cron expression.
+This docker image is used to backup a MySQL server into Amazon S3. It will dump, zip and stream each table directly into a separate "sql.gz"-file in S3 (no local temporary files). The backup is executed by a specified cron expression (5 fields, scheduled by [supercronic](https://github.com/aptible/supercronic)).
+
+The container does not run as root but as user `s3-backup` (uid 10001). The scripts belong to root and cannot be changed by this user, it only writes into `/app/data` (metrics, crontab, lock).
 
 InnoDB tables are dumped in a single transaction (consistent snapshot without locks), tables without transactions (e.g. MyISAM) are locked while they are dumped.
 
@@ -97,7 +99,7 @@ Only one backup runs at a time - a second start (e.g. manual backup while the cr
 The following command must be executed inside the container. The output goes to the container log (`docker logs`).
 
 ```shell
-/root/backup.sh > /proc/1/fd/1 2>&1
+/app/backup.sh > /proc/1/fd/1 2>&1
 ```
 
 ## Restore

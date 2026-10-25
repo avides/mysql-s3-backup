@@ -1,3 +1,1 @@
-SHELL=/bin/bash
-CRON_EXPR	root . /root/project_env.sh; /root/backup.sh > /proc/1/fd/1 2>&1
-# An empty line is required at the end of this file for a valid cron file.
+CRON_EXPR /app/backup.sh
