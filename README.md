@@ -33,7 +33,7 @@ GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'backup'@'%';
 | `LOCK TABLES` | dump tables without transactions (e.g. MyISAM) |
 
 ### IAM user
-The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upload into the bucket (replace `AWS_BUCKET_NAME`). Reading, listing or deleting backups is not needed, so a stolen key can neither read nor destroy existing backups:
+The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upload into the bucket (replace `AWS_BUCKET_NAME`). Reading, listing or deleting backups is not needed, so a stolen key can neither read nor list existing backups. It can still overwrite them (`s3:PutObject` replaces an existing file), only versioning or an object lock on the bucket protects against that:
 
 ```json
 {
@@ -54,7 +54,7 @@ The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upl
 | `s3:PutObject` | upload of a file, including the multipart upload of large files (create, upload parts, complete) |
 | `s3:AbortMultipartUpload` | abort the upload of a failed dump |
 
-If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` on that key.
+If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` and `kms:Decrypt` on that key (`kms:Decrypt` for the multipart upload of large files).
 
 ## Run
 ```

@@ -13,7 +13,7 @@ WORKDIR /app/
 ## Install MySQL-Client, pigz (parallel gzip), pv (byte count of the upload), Python 3 (metrics endpoint), supercronic (cron for containers, runs without root) and tools for the AWS-CLI,
 ## then the AWS-CLI with bigger parts for streamed uploads: the size is unknown, max. 10,000 parts -> ~312 GB per file
 ## instead of ~78 GB (32 MB needs ~140 MB memory for the upload, 64 MB already ~350 MB)
-## and only 2 parallel requests: the dump delivers slower than 2 uploads, more threads only add context switches
+## and only 2 parallel requests: the dump delivers slower than 2 uploads, each one more only costs memory for its part
 RUN apt update && apt install -y --no-install-recommends ca-certificates curl mysql-client pigz pv python3 unzip \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL --proto '=https' --tlsv1.2 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip \

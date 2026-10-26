@@ -75,7 +75,8 @@ function backup_mysql
             exec 3> upload_pipe
             set -o pipefail
             ## --no-tablespaces: a single table needs no tablespace definitions (they need the PROCESS privilege)
-            mysqldump $CONSISTENCY_OPTION --no-tablespaces --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz -p $PIGZ_THREADS | pv -n -b -i 3600 -B 4M 2> pv.log >&3
+            ## --set-gtid-purged=OFF: a single table needs no GTID_PURGED (with GTIDs it needs the RELOAD privilege and fails the restore into a server with GTIDs)
+            mysqldump $CONSISTENCY_OPTION --no-tablespaces --set-gtid-purged=OFF --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz -p $PIGZ_THREADS | pv -n -b -i 3600 -B 4M 2> pv.log >&3
             DUMP_RESULT=$?
             set +o pipefail
 
