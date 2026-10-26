@@ -22,7 +22,7 @@ The backup user needs the following privileges. Missing privileges let single ta
 
 ```sql
 CREATE USER 'backup'@'%' IDENTIFIED BY 'PASSWORD';
-GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS ON *.* TO 'backup'@'%';
+GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'backup'@'%';
 ```
 
 | Privilege | Needed for |
@@ -31,7 +31,6 @@ GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS ON *.* TO 'backup'@'%';
 | `SHOW VIEW` | dump views |
 | `TRIGGER` | dump the triggers of a table |
 | `LOCK TABLES` | dump tables without transactions (e.g. MyISAM) |
-| `PROCESS` | tablespace information of the dump (global privilege, MySQL >= 8.0.21) |
 
 ### IAM user
 The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upload into the bucket (replace `AWS_BUCKET_NAME`). Reading, listing or deleting backups is not needed, so a stolen key can neither read nor destroy existing backups:

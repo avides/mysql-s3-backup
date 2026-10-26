@@ -74,7 +74,8 @@ function backup_mysql
             ## so no incomplete file replaces a backup (the lifecycle rule removes the aborted upload)
             exec 3> upload_pipe
             set -o pipefail
-            mysqldump $CONSISTENCY_OPTION --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz -p $PIGZ_THREADS | pv -n -b -i 3600 -B 4M 2> pv.log >&3
+            ## --no-tablespaces: a single table needs no tablespace definitions (they need the PROCESS privilege)
+            mysqldump $CONSISTENCY_OPTION --no-tablespaces --max_allowed_packet=512M --host=$DB_HOST --port=$DB_PORT --user=$DB_USER "$database_name" "$table_name" | pigz -p $PIGZ_THREADS | pv -n -b -i 3600 -B 4M 2> pv.log >&3
             DUMP_RESULT=$?
             set +o pipefail
 
