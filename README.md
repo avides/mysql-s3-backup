@@ -54,7 +54,7 @@ The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upl
 | `s3:PutObject` | upload of a file, including the multipart upload of large files (create, upload parts, complete) |
 | `s3:AbortMultipartUpload` | abort the upload of a failed dump |
 
-If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` and `kms:Decrypt` on that key (`kms:Decrypt` for the multipart upload of large files).
+If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` and `kms:Decrypt` on that key (`kms:Decrypt` for the multipart upload of large files), and the key policy must allow this for the user (directly or by delegating to IAM policies).
 
 ## Run
 ```
