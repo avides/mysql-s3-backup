@@ -3,70 +3,110 @@
 [![Nightly build](https://github.com/avides/mysql-s3-backup/workflows/nightly/badge.svg)](https://github.com/avides/mysql-s3-backup/actions)
 [![Docker Pulls](https://img.shields.io/docker/pulls/avides/mysql-s3-backup.svg)](https://hub.docker.com/r/avides/mysql-s3-backup)
 
-This script is used to backup a MySQL Server, ZIP the data and upload it to Amazon S3. It will dump, zip and upload each table in a separate "sql.gz"-file. This script will be executed by a specified cron expression.
+This docker image is used to backup a MySQL server into Amazon S3. It will dump, zip and stream each table directly into a separate "sql.gz"-file in S3 (no local temporary files). The backup is executed by a specified cron expression (5 fields, scheduled by [supercronic](https://github.com/aptible/supercronic)).
+
+The container does not run as root but as user `s3-backup` (uid 10001). The scripts belong to root and cannot be changed by this user, it only writes into `/app/data` (metrics, crontab, lock).
+
+InnoDB tables are dumped in a single transaction (consistent snapshot without locks), tables without transactions (e.g. MyISAM) are locked while they are dumped.
 
 ## Requirements
 
 - Docker
-- MySQL > 5.7
+- MySQL >= 8.0
+- S3 bucket with a lifecycle rule that aborts incomplete multipart uploads (a failed dump aborts its upload, the uploaded parts stay until then)
+- MySQL user for the backup (see [MySQL user](#mysql-user))
+- IAM user for the upload (see [IAM user](#iam-user))
 
-## Usage
+### MySQL user
+The backup user needs the following privileges. Missing privileges let single tables fail, without `TRIGGER` the triggers are silently missing in the dump:
 
-Set up your variables in the placeholder and run the following command on your docker server:
+```sql
+CREATE USER 'backup'@'%' IDENTIFIED BY 'PASSWORD';
+GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON *.* TO 'backup'@'%';
+```
+
+| Privilege | Needed for |
+|---|---|
+| `SELECT` | list the databases and tables, dump the data |
+| `SHOW VIEW` | dump views |
+| `TRIGGER` | dump the triggers of a table |
+| `LOCK TABLES` | dump tables without transactions (e.g. MyISAM) |
+
+### IAM user
+The keys `S3_ACCESS_KEY`/`S3_SECRET_KEY` belong to an IAM user that may only upload into the bucket (replace `AWS_BUCKET_NAME`). Reading, listing or deleting backups is not needed, so a stolen key can neither read nor list existing backups. It can still overwrite them (`s3:PutObject` replaces an existing file), only versioning or an object lock on the bucket protects against that:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Upload",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::AWS_BUCKET_NAME/*"
+    }
+  ]
+}
+```
+
+| Permission | Needed for |
+|---|---|
+| `s3:PutObject` | upload of a file, including the multipart upload of large files (create, upload parts, complete) |
+| `s3:AbortMultipartUpload` | abort the upload of a failed dump |
+
+If the bucket is encrypted with a customer managed KMS key (SSE-KMS), the user additionally needs `kms:GenerateDataKey` and `kms:Decrypt` on that key (`kms:Decrypt` for the multipart upload of large files), and the key policy must allow this for the user (directly or by delegating to IAM policies).
+
+## Run
 ```
 docker run \
 -d \
 --name=mysql-s3-backup \
+--restart=unless-stopped \
 --env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
 --env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
 --env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
 --env S3_SECRET_KEY="AWS_SECRET_KEY" \
 --env S3_REGION="AWS_REGION" \
+--env S3_STORAGE_CLASS="S3_STORAGE_CLASS (optional, e.g. STANDARD_IA, default: STANDARD)" \
 --env MYSQL_HOST="MYSQL_HOST" \
---env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST}" \
+--env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
 --env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
---env MYSQL_BACKUP_USER="root" \
+--env MYSQL_BACKUP_USER="MYSQL_BACKUP_USER" \
 --env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
 -p 9300:9300 \
+--cpus=1 \
+--memory=512m \
 avides/mysql-s3-backup:latest
 ```
 
-### Build & Test
-
-The following commands are useful if you want to run the code locally.
-
+## Build & Test
 ```
 docker build -t mysql-s3-backup-dev .
+```
 
-docker run \
--d \
---name=mysql-s3-backup \
---env CRON_EXPR="0 18 * * * (Info: UTC-Timezone)" \
---env S3_BUCKET_NAME="AWS_BUCKET_NAME" \
---env S3_ACCESS_KEY="AWS_ACCESS_KEY" \
---env S3_SECRET_KEY="AWS_SECRET_KEY" \
---env S3_REGION="AWS_REGION" \
---env MYSQL_HOST_ALIAS="MYSQL_HOST_ALIAS (default: ${MYSQL_HOST})" \
---env MYSQL_HOST="MYSQL_HOST" \
---env MYSQL_PORT="MYSQL_PORT (default: 3306)" \
---env MYSQL_BACKUP_USER="root" \
---env MYSQL_BACKUP_PASS="MYSQL_BACKUP_PASS" \
--p 9300:9300 \
-mysql-s3-backup-dev
+Start the image as described in [Run](#run), with `mysql-s3-backup-dev` instead of `avides/mysql-s3-backup:latest` and a test bucket. Then:
 
+```
 docker logs -f mysql-s3-backup
 
 docker exec -it mysql-s3-backup /bin/bash
 ```
 
-### Trigger backup manually
-Caution: Please avoid concurrent backup processes (e.g. via cron & manual backup)!
+## Trigger backup manually
+Only one backup runs at a time - a second start (e.g. manual backup while the cron backup runs) is rejected.
 
-The following command must be executed inside the container.
-Therefore, you must log in inside the container or pass the command to the container. 
+The following command must be executed inside the container. The output goes to the container log (`docker logs`).
 
 ```shell
-/root/backup.sh >> /var/log/backup-cron/cron.log
+/app/backup.sh > /proc/1/fd/1 2>&1
+```
+
+## Restore
+
+Each table is stored as a separate "sql.gz"-file and can be restored on its own:
+
+```shell
+aws s3 cp s3://AWS_BUCKET_NAME/YYYY-MM-DD/MYSQL_HOST_ALIAS/DATABASE/TABLE.sql.gz - | gunzip | mysql --host=MYSQL_HOST --user=USER -p DATABASE
 ```
 
 ## Metrics
@@ -76,12 +116,14 @@ This container delivers some metrics about the MySQL backups. The metrics are av
 | Name | Datatype |
 |---|---|
 | mysql_s3_backup_successful | gauge (1=successful / 0=failed) |
-| mysql_s3_backup_start_timestamp | gauge (timestamp in milliesconds) |
+| mysql_s3_backup_start_timestamp | gauge (timestamp in milliseconds) |
+| mysql_s3_backup_last_success_timestamp | gauge (timestamp in milliseconds, end of the last successful backup) |
+| mysql_s3_backup_total_duration_in_ms | gauge (duration of the whole backup in milliseconds) |
 | mysql_s3_backup_file_size_in_bytes{database="database", table="table"} | gauge (file size in bytes) |
-| mysql_s3_backup_duration_in_ms{database="database", table="table"} | gauge (duration in millieseconds) |
+| mysql_s3_backup_duration_in_ms{database="database", table="table"} | gauge (duration in milliseconds) |
 
 ## Grafana dashboard
 
-To use the preconfigured dashboard for Grafana you have to import the [Config-File](grafana-dashboard/config.json) to your Grafana instance.
+To use the preconfigured dashboard for Grafana (>= 10) you have to import the [Config-File](grafana-dashboard/config.json) to your Grafana instance and select the Prometheus data source. It shows the state of every backup instance, the history of duration and size, and details per database and table.
 
 ![Grafana dashboard example](grafana-dashboard/example.png?raw=true "Grafana dashboard example")

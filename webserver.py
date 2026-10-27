@@ -1,15 +1,25 @@
-import simple_http_server.server as server
-
-from simple_http_server import request_map
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-@request_map("/metrics")
-def metrics():
-    return Path('/root/metrics.txt').read_text()
+class MetricsHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/metrics":
+            self.send_error(404)
+            return
 
-def main(*args):
+        body = Path('/app/data/metrics.txt').read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        # No access log: Prometheus scrapes every few seconds and would flood the container log
+        pass
+
+def main():
     print("Server starting...")
-    server.start(port=9300)
-    print("Server started!")
+    ThreadingHTTPServer(("", 9300), MetricsHandler).serve_forever()
 
 main()

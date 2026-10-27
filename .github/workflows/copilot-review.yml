@@ -1,0 +1,132 @@
+# This configuration verifies that Copilot has reviewed the latest commit of the pull request
+# It is required by the organization ruleset, so merging is blocked until a Copilot review is manually requested after the last push
+name: copilot-review
+
+on:
+  pull_request:
+    # Runs on pull request creation and on every new commit, so a new commit invalidates the previous Copilot review
+    # Runs on review requests, so requesting the Copilot review waits for it and turns the check green
+    types: [opened, synchronize, reopened, review_requested]
+  pull_request_review:
+    # Runs when a human submits a review - runs triggered by the review of Copilot itself require an approval and are not reliable
+    types: [submitted]
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  copilot-review:
+    timeout-minutes: 30
+
+    runs-on: ubuntu-latest
+
+    # No cancelling: a waiting run must not be replaced by a run of an unrelated event, it ends itself on a new commit
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+
+    steps:
+      # Verify that a successful Copilot review exists for the current head commit
+      - name: verify-copilot-review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          AUTOUPDATE_USER: avides-builds
+        run: |
+          # Prints the commits whose Copilot review applies to the head, newest first: the head and, as long as the newer commit
+          # is a configuration autoupdate commit (by the autoupdate user and only changing workflows), the commit before it -
+          # the autoupdate changes nothing in the project, so a review of the commit before it still counts
+          accepted_commits() {
+            local HEAD=$1 COMMITS SHA LOGIN ONLY_WORKFLOWS
+            COMMITS=$(gh api --paginate "repos/$REPOSITORY/pulls/$PULL_REQUEST/commits" \
+              --jq '.[] | "\(.sha) \(.author.login // "-")"' | tac) || return 1
+            # The endpoint returns at most 250 commits - if the list does not start with the head, only the head is accepted
+            if [ "${COMMITS%% *}" != "$HEAD" ]; then
+              echo "$HEAD"
+              return 0
+            fi
+            while read -r SHA LOGIN; do
+              echo "$SHA"
+              [ "$LOGIN" = "$AUTOUPDATE_USER" ] || return 0
+              # The files are compared with the only parent, so merge commits never count - renames are checked with their source
+              # path, a commit with 300 or more files may be truncated and never counts
+              ONLY_WORKFLOWS=$(gh api "repos/$REPOSITORY/commits/$SHA" \
+                --jq '(.parents | length == 1) and (.files | length < 300 and ([.[] | .filename, (.previous_filename // empty)] | all(startswith(".github/workflows/"))))') || return 1
+              [ "$ONLY_WORKFLOWS" = "true" ] || return 0
+            done <<< "$COMMITS"
+          }
+
+          # The head is read from the API instead of the event payload, so a re-run checks the current state
+          HEAD_SHA=$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq '.head.sha')
+          ACCEPTED=$(accepted_commits "$HEAD_SHA")
+
+          # Copilot starts a requested review about 15 seconds after the request, this run is created within a few seconds, so
+          # review attempts started more than 10 seconds before are older ones (e.g. a failed attempt before a quick re-request) -
+          # the creation of this run is used instead of its start, because it may have waited in the concurrency group
+          CREATED_AT=$(gh api "repos/$REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at')
+          STARTED_AFTER=$(date -u -d "@$(( $(date -u -d "$CREATED_AT" +%s) - 10 ))" +%Y-%m-%dT%H:%M:%SZ)
+
+          # Prints the Copilot review runs of the accepted commits as "<status> <started_at>" - every requested review runs as
+          # check run of the commit that was the head when the review started
+          copilot_runs() {
+            for SHA in $ACCEPTED; do
+              gh api --paginate "repos/$REPOSITORY/commits/$SHA/check-runs" \
+                --jq '.check_runs[] | select(.name == "copilot-pull-request-reviewer") | "\(.status) \(.started_at)"'
+            done
+          }
+
+          # Waits until the condition is met, the job timeout ends a review that never finishes - a new commit ends the run,
+          # unless it is a configuration autoupdate commit, then the accepted commits are extended and the waiting continues
+          wait_for() {
+            until "$@"; do
+              if [ -z "$WAITING" ]; then
+                echo "Waiting for the Copilot review of ${HEAD_SHA:0:7}."
+                WAITING=true
+              fi
+              sleep 20
+              CURRENT_SHA=$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq '.head.sha')
+              if [ "$CURRENT_SHA" != "$HEAD_SHA" ]; then
+                CURRENT_ACCEPTED=$(accepted_commits "$CURRENT_SHA")
+                if ! grep -qx "$HEAD_SHA" <<< "$CURRENT_ACCEPTED"; then
+                  echo "::error::A new commit was pushed while waiting for the Copilot review of ${HEAD_SHA:0:7}. Request a Copilot review again."
+                  exit 1
+                fi
+                echo "Configuration autoupdate commit ${CURRENT_SHA:0:7} pushed, the Copilot review of ${HEAD_SHA:0:7} still counts."
+                HEAD_SHA=$CURRENT_SHA
+                ACCEPTED=$CURRENT_ACCEPTED
+              fi
+            done
+          }
+          requested_run_completed() { copilot_runs | awk -v after="$STARTED_AFTER" '$1 == "completed" && $2 >= after { found = 1 } END { exit !found }'; }
+          no_run_pending() { [ -z "$(copilot_runs | grep -v '^completed ' || true)" ]; }
+
+          # A run started by the Copilot review request waits for exactly this review, older (e.g. failed) attempts do not count
+          if [ "$REQUESTED_REVIEWER" = "Copilot" ] || [ "$REQUESTED_REVIEWER" = "copilot-pull-request-reviewer[bot]" ]; then
+            wait_for requested_run_completed
+          fi
+
+          # Every other run waits for a pending Copilot review as well - it may have replaced a waiting run in the concurrency group
+          wait_for no_run_pending
+
+          # Only reviews of an accepted commit containing the Copilot overview count - if Copilot could not review (e.g. quota
+          # limit reached), it still posts a review, but without the overview
+          ACCEPTED_JSON="[$(printf '"%s",' $ACCEPTED | sed 's/,$//')]"
+          REVIEWED_SHA=$(gh api --paginate "repos/$REPOSITORY/pulls/$PULL_REQUEST/reviews" \
+            --jq ".[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and (.commit_id as \$sha | $ACCEPTED_JSON | index(\$sha) != null) and (.body | contains(\"<!-- ccr-overview\"))) | .commit_id" \
+            | tail -n 1)
+
+          if [ -z "$REVIEWED_SHA" ]; then
+            echo "::error::Copilot has not reviewed the latest commit ${HEAD_SHA:0:7} yet. Request a Copilot review on the pull request after your last push, this check waits for it."
+            exit 1
+          fi
+
+          if [ "$REVIEWED_SHA" = "$HEAD_SHA" ]; then
+            echo "Copilot has reviewed the latest commit ${HEAD_SHA:0:7}."
+          else
+            echo "Copilot has reviewed ${REVIEWED_SHA:0:7}, the following commits up to ${HEAD_SHA:0:7} are configuration autoupdate commits only."
+          fi
